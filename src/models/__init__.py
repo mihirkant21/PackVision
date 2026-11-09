@@ -6,6 +6,12 @@ from src.models.packvision_net import (
     FiLMBlock,
     ResnetBlock,
     SpatialSelfAttention,
+    StructuralEdgeAttention,
+    AttentionGate,
+    SketchEdgePyramid,
+    MultiScaleDiscriminator,
+    MultiScaleSobelLoss,
+    ColorConsistencyLoss,
 )
 
 __all__ = [
@@ -14,4 +20,10 @@ __all__ = [
     "FiLMBlock",
     "ResnetBlock",
     "SpatialSelfAttention",
+    "StructuralEdgeAttention",
+    "AttentionGate",
+    "SketchEdgePyramid",
+    "MultiScaleDiscriminator",
+    "MultiScaleSobelLoss",
+    "ColorConsistencyLoss",
 ]

@@ -17,9 +17,13 @@ from src.prompt_engine import (
     build_packaging_prompt,
 )
 from src.pipeline import (
+    FacetAware3DSegmenter,
+    FacetAware3DShader,
+    FacetData,
     PackVisionRenderer,
     ProceduralPackagingRenderer,
     RenderResult,
+    SegmentationResult,
 )
 from src.postprocessor import CompositorResult, LogoCompositor
 from src.evaluation import (
@@ -46,6 +50,10 @@ __all__ = [
     # Pipeline & Renderer
     "PackVisionRenderer",
     "ProceduralPackagingRenderer",
+    "FacetAware3DSegmenter",
+    "FacetAware3DShader",
+    "FacetData",
+    "SegmentationResult",
     "RenderResult",
     # Postprocessing
     "LogoCompositor",
