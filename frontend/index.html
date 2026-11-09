@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PackVision AI - Sketch-to-Photoreal Packaging Renderer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-amber-500 selection:text-black">
+
+  <!-- ========================================================================= -->
+  <!-- TOP STUDIO HEADER                                                         -->
+  <!-- ========================================================================= -->
+  <header class="studio-header border-b border-zinc-800 bg-slate-900/90 backdrop-blur-md sticky top-0 z-40 px-6 py-3.5 flex items-center justify-between">
+    <div class="flex items-center gap-4">
+      <div class="brand-emblem flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 via-amber-500 to-amber-700 shadow-lg shadow-amber-500/20 text-slate-950 font-black text-xl">
+        PV
+      </div>
+      <div>
+        <div class="flex items-center gap-2.5">
+          <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+            PackVision <span class="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-amber-200">AI</span>
+          </h1>
+          <span class="version-tag text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30">
+            Studio Pro v1.0
+          </span>
+        </div>
+        <p class="text-xs text-slate-400">Sketch-to-Photoreal Packaging Renderer • Conditional Structural Diffusion</p>
+      </div>
+    </div>
+
+    <!-- Center Disclaimer -->
+    <div class="hidden lg:flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/60 border border-zinc-700/50 text-xs text-slate-300">
+      <svg class="w-3.5 h-3.5 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      <span>Concept visualization engine for packaging designers & CPG brand teams</span>
+    </div>
+
+    <!-- Right System Status & External Links -->
+    <div class="flex items-center gap-3">
+      <div id="backend-status-badge" class="flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-emerald-400 text-xs font-medium">
+        <span class="relative flex h-2 w-2">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+        </span>
+        <span id="backend-status-text">Connecting...</span>
+      </div>
+
+      <a href="http://localhost:7860" target="_blank" rel="noopener noreferrer" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-xs font-semibold text-slate-200 transition">
+        <svg class="w-3.5 h-3.5 text-amber-400" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+        Gradio Workbench
+      </a>
+
+      <a href="/docs" target="_blank" rel="noopener noreferrer" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-xs font-semibold text-slate-200 transition">
+        <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+        API Reference
+      </a>
+
+      <button id="toggle-history-btn" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-xs font-semibold text-amber-300 transition" title="Toggle History Drawer">
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <span>History</span>
+        <span id="history-badge-count" class="px-1.5 py-0.2 rounded-full bg-amber-500/30 text-[10px] font-bold">0</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================================================= -->
+  <!-- MAIN WORKBENCH GRID                                                       -->
+  <!-- ========================================================================= -->
+  <main class="workbench-main flex-1 grid grid-cols-1 xl:grid-cols-12 gap-0 overflow-hidden relative">
+
+    <!-- ----------------------------------------------------------------------- -->
+    <!-- LEFT PANEL: STUDIO CONTROLS & SKETCH CANVAS                             -->
+    <!-- ----------------------------------------------------------------------- -->
+    <aside class="col-span-1 xl:col-span-5 border-r border-zinc-800 bg-slate-900/40 p-5 overflow-y-auto max-h-[calc(100vh-65px)] flex flex-col gap-6 custom-scrollbar">
+
+      <!-- SECTION 1: SKETCH INGESTION & CANVAS STUDIO -->
+      <section class="studio-card p-4 rounded-xl border border-zinc-800/80 bg-slate-900/60 shadow-md">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+            <h2 class="text-sm font-bold uppercase tracking-wider text-slate-200">1. Sketch Ingestion & Canvas</h2>
+          </div>
+          <span class="text-xs text-slate-400">Dielines & Geometry Input</span>
+        </div>
+
+        <!-- Sample Loaders -->
+        <div class="mb-3">
+          <span class="text-[11px] font-semibold text-slate-400 block mb-1.5">Load Benchmark Sketch:</span>
+          <div class="grid grid-cols-3 gap-2">
+            <button type="button" class="sample-btn px-2.5 py-1.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700/80 border border-zinc-700 text-xs font-medium text-slate-200 flex items-center justify-center gap-1.5 transition active:scale-95" data-sample="carton">
+              <span>📦</span> Carton Box
+            </button>
+            <button type="button" class="sample-btn px-2.5 py-1.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700/80 border border-zinc-700 text-xs font-medium text-slate-200 flex items-center justify-center gap-1.5 transition active:scale-95" data-sample="pouch">
+              <span>🛍️</span> Doy Pouch
+            </button>
+            <button type="button" class="sample-btn px-2.5 py-1.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700/80 border border-zinc-700 text-xs font-medium text-slate-200 flex items-center justify-center gap-1.5 transition active:scale-95" data-sample="bottle">
+              <span>🧴</span> Serum Bottle
+            </button>
+          </div>
+        </div>
+
+        <!-- Interactive Canvas & Upload Area -->
+        <div id="drop-zone" class="drop-zone relative border-2 border-dashed border-zinc-700 hover:border-amber-400/80 rounded-xl bg-slate-950/60 transition duration-200 flex flex-col items-center justify-center min-h-[300px] overflow-hidden group">
+          <input type="file" id="sketch-file-input" class="absolute inset-0 opacity-0 cursor-pointer z-20" accept="image/png,image/jpeg,image/webp,image/bmp">
+          
+          <!-- Empty State Graphic -->
+          <div id="upload-empty-state" class="p-6 text-center flex flex-col items-center justify-center pointer-events-none transition duration-200">
+            <div class="w-14 h-14 rounded-full bg-zinc-800/90 border border-zinc-700 flex items-center justify-center text-amber-400 mb-3 shadow-inner group-hover:scale-105 group-hover:border-amber-400/50 transition">
+              <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+              </svg>
+            </div>
+            <p class="text-sm font-semibold text-slate-200 mb-1">Drag & drop packaging sketch here</p>
+            <p class="text-xs text-slate-400 mb-3">Hand-drawn line-art, digital dieline, or CAD wireframe (PNG, JPG, max 25MB)</p>
+            <span class="inline-flex items-center gap-1 text-xs font-bold text-amber-400 bg-amber-400/10 px-3 py-1 rounded-md border border-amber-400/20">
+              Browse Local Files
+            </span>
+          </div>
+
+          <!-- Canvas Element for Sketch Display and Drawing Touch-up -->
+          <canvas id="sketch-canvas" width="512" height="512" class="hidden absolute inset-0 w-full h-full object-contain z-10 cursor-crosshair bg-white"></canvas>
+          
+          <!-- Clear Overlay Badge when image is loaded -->
+          <div id="canvas-overlay-bar" class="hidden absolute top-2 right-2 z-30 flex items-center gap-1.5">
+            <button id="btn-invert-lines" type="button" class="p-1.5 rounded-md bg-slate-900/80 hover:bg-slate-800 border border-zinc-700 text-xs font-semibold text-amber-400 shadow transition" title="Invert Lines (Dark/Light)">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+              </svg>
+            </button>
+            <button id="btn-clear-canvas" type="button" class="p-1.5 rounded-md bg-rose-950/80 hover:bg-rose-900 border border-rose-700/50 text-xs font-semibold text-rose-300 shadow transition" title="Clear Canvas">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Canvas Toolbar for In-Browser Touch-Up -->
+        <div id="canvas-tools" class="mt-3 pt-3 border-t border-zinc-800 flex items-center justify-between text-xs text-slate-400">
+          <div class="flex items-center gap-2">
+            <label class="flex items-center gap-1.5 cursor-pointer">
+              <input type="radio" name="tool-mode" id="tool-brush" value="brush" checked class="text-amber-500 focus:ring-0">
+              <span class="text-slate-300">Brush Touch-Up</span>
+            </label>
+            <label class="flex items-center gap-1.5 cursor-pointer">
+              <input type="radio" name="tool-mode" id="tool-eraser" value="eraser" class="text-amber-500 focus:ring-0">
+              <span class="text-slate-300">Eraser</span>
+            </label>
+          </div>
+          <div class="flex items-center gap-2">
+            <span>Size:</span>
+            <input type="range" id="brush-size" min="1" max="16" value="3" class="w-20 accent-amber-500">
+            <span id="brush-size-val" class="font-mono text-slate-200">3px</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 2: PACKAGING CONFIGURATION & SHADERS -->
+      <section class="studio-card p-4 rounded-xl border border-zinc-800/80 bg-slate-900/60 shadow-md flex flex-col gap-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+            <h2 class="text-sm font-bold uppercase tracking-wider text-slate-200">2. Packaging Configuration & Shaders</h2>
+          </div>
+          <span class="text-xs text-slate-400">Physical Taxonomy</span>
+        </div>
+
+        <!-- Category & Material Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label for="category-select" class="block text-xs font-semibold text-slate-300 mb-1.5">Packaging Form / Category</label>
+            <select id="category-select" class="w-full px-3 py-2 rounded-lg bg-zinc-800/90 border border-zinc-700 text-slate-200 text-xs font-medium focus:border-amber-400 focus:outline-none transition">
+              <option value="box" selected>Folding Carton / Box</option>
+              <option value="pouch">Stand-Up Pouch (Doy-pack)</option>
+              <option value="bottle">Cosmetic Serum Bottle</option>
+              <option value="jar">Cream / Preserves Jar</option>
+              <option value="can">Beverage Can / Aerosol</option>
+              <option value="tube">Flexible Squeeze Tube</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="material-select" class="block text-xs font-semibold text-slate-300 mb-1.5">Substrate Material (PBR)</label>
+            <select id="material-select" class="w-full px-3 py-2 rounded-lg bg-zinc-800/90 border border-zinc-700 text-slate-200 text-xs font-medium focus:border-amber-400 focus:outline-none transition">
+              <option value="cardboard" selected>Matte Folding Carton Paperboard</option>
+              <option value="kraft_paper">Unbleached Natural Kraft Paper</option>
+              <option value="glass">Clear / Amber Luxury Glass</option>
+              <option value="aluminum">Anodized Brushed Aluminum</option>
+              <option value="plastic">High-Gloss Flexible Mylar Polymer</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Finish & Lighting Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label for="finish-select" class="block text-xs font-semibold text-slate-300 mb-1.5">Print Finish & Embellishment</label>
+            <select id="finish-select" class="w-full px-3 py-2 rounded-lg bg-zinc-800/90 border border-zinc-700 text-slate-200 text-xs font-medium focus:border-amber-400 focus:outline-none transition">
+              <option value="foil_stamping" selected>Gold / Silver Hot Foil Stamping</option>
+              <option value="matte">Soft-Touch Velvet Matte</option>
+              <option value="glossy">Spot UV High-Gloss Varnish</option>
+              <option value="embossed">3D Embossed Relief Contour</option>
+              <option value="metallic">Iridescent Holographic Metallic Sheen</option>
+              <option value="frosted">Frosted Translucent Etch</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="lighting-select" class="block text-xs font-semibold text-slate-300 mb-1.5">Studio Lighting Rig</label>
+            <select id="lighting-select" class="w-full px-3 py-2 rounded-lg bg-zinc-800/90 border border-zinc-700 text-slate-200 text-xs font-medium focus:border-amber-400 focus:outline-none transition">
+              <option value="studio_softbox" selected>Dual Commercial Softbox Rigs</option>
+              <option value="dramatic_rim">Dramatic Luxury Rim Light</option>
+              <option value="natural_golden">Warm Golden Hour Window Light</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Camera & Background Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label for="viewpoint-select" class="block text-xs font-semibold text-slate-300 mb-1.5">Camera Viewpoint</label>
+            <select id="viewpoint-select" class="w-full px-3 py-2 rounded-lg bg-zinc-800/90 border border-zinc-700 text-slate-200 text-xs font-medium focus:border-amber-400 focus:outline-none transition">
+              <option value="three_quarter" selected>Three-Quarter (3/4) Isometric Hero</option>
+              <option value="front">Front-Facing Eye Level</option>
+              <option value="isometric">Axonometric Technical Perspective</option>
+              <option value="top_down">Top-Down Flat Lay</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="background-select" class="block text-xs font-semibold text-slate-300 mb-1.5">Backdrop Environment</label>
+            <select id="background-select" class="w-full px-3 py-2 rounded-lg bg-zinc-800/90 border border-zinc-700 text-slate-200 text-xs font-medium focus:border-amber-400 focus:outline-none transition">
+              <option value="studio_clean" selected>Seamless Neutral Studio Infinity</option>
+              <option value="retail_shelf">High-End Boutique Retail Display</option>
+              <option value="minimalist_gradient">Modern Minimalist Dark Pedestal</option>
+              <option value="outdoor_natural">Natural Ambient Organic Elements</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 3: PROMPT ENGINEERING -->
+      <section class="studio-card p-4 rounded-xl border border-zinc-800/80 bg-slate-900/60 shadow-md flex flex-col gap-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+            <h2 class="text-sm font-bold uppercase tracking-wider text-slate-200">3. Creative Prompt Directives</h2>
+          </div>
+          <button id="btn-enrich-prompt" type="button" class="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 transition">
+            <span>✨</span> Auto-Enrich Prompt
+          </button>
+        </div>
+
+        <div>
+          <label for="user-prompt" class="block text-xs font-semibold text-slate-300 mb-1">Concept Description / Brand Aesthetics</label>
+          <textarea id="user-prompt" rows="2" class="w-full px-3 py-2 rounded-lg bg-zinc-800/90 border border-zinc-700 text-slate-200 text-xs font-mono focus:border-amber-400 focus:outline-none transition" placeholder="e.g. Luxury botanical herbal tea carton, gold foil debossed accents, minimalist typography"></textarea>
+        </div>
+
+        <div>
+          <label for="negative-prompt" class="block text-xs font-semibold text-slate-400 mb-1">Negative Conditioning (What to Exclude)</label>
+          <textarea id="negative-prompt" rows="1" class="w-full px-3 py-1.5 rounded-lg bg-zinc-900/90 border border-zinc-800 text-slate-400 text-xs font-mono focus:border-zinc-600 focus:outline-none transition" placeholder="distorted geometry, broken dielines, blurry seams, low quality, warped text"></textarea>
+        </div>
+      </section>
+
+      <!-- SECTION 4: STAGE 2 LOGO & LABEL OVERLAY (COLLAPSIBLE) -->
+      <section class="studio-card rounded-xl border border-zinc-800/80 bg-slate-900/60 shadow-md overflow-hidden">
+        <button id="toggle-logo-panel" type="button" class="w-full p-4 flex items-center justify-between text-left hover:bg-slate-800/30 transition">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+            <h2 class="text-sm font-bold uppercase tracking-wider text-slate-200">4. Stage-2 Brand Logo / Flat Label Overlay</h2>
+          </div>
+          <svg id="logo-panel-icon" class="w-4 h-4 text-slate-400 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </button>
+
+        <div id="logo-panel-content" class="p-4 pt-0 border-t border-zinc-800/60 hidden flex flex-col gap-3.5">
+          <p class="text-xs text-slate-400">
+            Homography perspective warping projected onto 3D packaging face with CIELAB luminance blending to preserve realistic surface textures and lighting.
+          </p>
+
+          <div class="flex items-center gap-3">
+            <div class="relative w-20 h-20 rounded-lg border-2 border-dashed border-zinc-700 flex items-center justify-center bg-slate-950/80 shrink-0 overflow-hidden">
+              <input type="file" id="logo-file-input" class="absolute inset-0 opacity-0 cursor-pointer z-10" accept="image/png,image/webp">
+              <img id="logo-preview-thumb" class="hidden w-full h-full object-contain p-1" alt="Logo preview">
+              <div id="logo-empty-icon" class="text-center p-1 text-slate-500">
+                <span class="text-xl">🏷️</span>
+                <span class="text-[9px] block text-slate-400 mt-1">Upload PNG</span>
+              </div>
+            </div>
+
+            <div class="flex-1 text-xs">
+              <span id="logo-filename" class="font-semibold text-slate-300 block mb-1">No logo selected</span>
+              <p class="text-slate-500 text-[11px] mb-2">Transparent background PNG recommended.</p>
+              <button id="btn-load-sample-logo" type="button" class="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-amber-400 font-semibold text-[11px] transition">
+                Load Sample Brand Logo
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 text-xs">
+            <div>
+              <div class="flex justify-between text-slate-400 mb-1">
+                <span>Position X</span>
+                <span id="logo-x-val" class="font-mono text-slate-200">50%</span>
+              </div>
+              <input type="range" id="logo-pos-x" min="15" max="85" value="50" class="w-full accent-amber-500">
+            </div>
+
+            <div>
+              <div class="flex justify-between text-slate-400 mb-1">
+                <span>Position Y</span>
+                <span id="logo-y-val" class="font-mono text-slate-200">52%</span>
+              </div>
+              <input type="range" id="logo-pos-y" min="15" max="85" value="52" class="w-full accent-amber-500">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 text-xs">
+            <div>
+              <div class="flex justify-between text-slate-400 mb-1">
+                <span>Scale Size</span>
+                <span id="logo-scale-val" class="font-mono text-slate-200">45%</span>
+              </div>
+              <input type="range" id="logo-scale" min="15" max="90" value="45" class="w-full accent-amber-500">
+            </div>
+
+            <div>
+              <label for="logo-blend-mode" class="block text-slate-400 mb-1">Ink Blend Mode</label>
+              <select id="logo-blend-mode" class="w-full px-2 py-1.5 rounded bg-zinc-800 border border-zinc-700 text-slate-200 text-xs focus:border-amber-400">
+                <option value="multiply" selected>Multiply (Fiber absorption)</option>
+                <option value="overlay">Overlay (Dynamic contrast)</option>
+                <option value="hard_light">Hard Light (Specular ink)</option>
+                <option value="normal">Normal (Solid ink film)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 5: ADVANCED PARAMETERS (COLLAPSIBLE) -->
+      <section class="studio-card rounded-xl border border-zinc-800/80 bg-slate-900/60 shadow-md overflow-hidden">
+        <button id="toggle-advanced-panel" type="button" class="w-full p-4 flex items-center justify-between text-left hover:bg-slate-800/30 transition">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-slate-500"></span>
+            <h2 class="text-sm font-bold uppercase tracking-wider text-slate-300">5. Advanced Parameters</h2>
+          </div>
+          <svg id="advanced-panel-icon" class="w-4 h-4 text-slate-400 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </button>
+
+        <div id="advanced-panel-content" class="p-4 pt-0 border-t border-zinc-800/60 hidden grid grid-cols-2 gap-3.5 text-xs">
+          <div>
+            <label for="input-steps" class="block text-slate-400 mb-1">Denoising Steps</label>
+            <input type="number" id="input-steps" min="10" max="60" value="30" class="w-full px-2.5 py-1.5 rounded bg-zinc-800 border border-zinc-700 text-slate-200 font-mono text-xs">
+          </div>
+          <div>
+            <label for="input-guidance" class="block text-slate-400 mb-1">CFG Guidance Scale</label>
+            <input type="number" id="input-guidance" min="1.0" max="15.0" step="0.5" value="7.5" class="w-full px-2.5 py-1.5 rounded bg-zinc-800 border border-zinc-700 text-slate-200 font-mono text-xs">
+          </div>
+          <div>
+            <label for="input-controlnet-scale" class="block text-slate-400 mb-1">ControlNet Scale</label>
+            <input type="number" id="input-controlnet-scale" min="0.1" max="1.5" step="0.05" value="0.85" class="w-full px-2.5 py-1.5 rounded bg-zinc-800 border border-zinc-700 text-slate-200 font-mono text-xs">
+          </div>
+          <div>
+            <label for="input-seed" class="block text-slate-400 mb-1">Seed (-1 = Random)</label>
+            <input type="number" id="input-seed" value="-1" class="w-full px-2.5 py-1.5 rounded bg-zinc-800 border border-zinc-700 text-slate-200 font-mono text-xs">
+          </div>
+        </div>
+      </section>
+
+      <!-- PRIMARY GENERATE BUTTON -->
+      <div class="sticky bottom-0 pt-2 pb-1 bg-gradient-to-t from-slate-950 via-slate-950 to-transparent">
+        <button id="btn-generate" type="button" class="w-full py-3.5 px-6 rounded-xl font-bold text-slate-950 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 hover:from-amber-300 hover:to-amber-500 shadow-xl shadow-amber-500/25 active:scale-[0.99] transition duration-150 flex items-center justify-center gap-2 text-sm tracking-wide">
+          <svg class="w-5 h-5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+          </svg>
+          <span id="btn-generate-text">Generate Photoreal Mockup</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- ----------------------------------------------------------------------- -->
+    <!-- RIGHT PANEL: PREVIEW STAGE & SPLIT COMPARISON SLIDER                    -->
+    <!-- ----------------------------------------------------------------------- -->
+    <section class="col-span-1 xl:col-span-7 p-6 flex flex-col justify-between overflow-y-auto max-h-[calc(100vh-65px)] bg-slate-950/90 relative custom-scrollbar">
+
+      <!-- STAGE TOP BAR: VIEW MODE CONTROLS & STATUS -->
+      <div class="flex items-center justify-between pb-4 border-b border-zinc-800/80 mb-4">
+        <div class="flex items-center gap-3">
+          <h2 class="text-sm font-bold uppercase tracking-wider text-slate-200">Photoreal Render Stage</h2>
+          <span id="job-status-pill" class="hidden px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide uppercase">
+            Queued
+          </span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <!-- View mode toggle buttons -->
+          <div class="bg-zinc-900 border border-zinc-800 rounded-lg p-0.5 flex items-center text-xs">
+            <button id="view-mode-split" type="button" class="px-2.5 py-1 rounded-md font-semibold text-amber-400 bg-zinc-800 shadow transition" title="Interactive Split Comparison Slider">
+              Split Slider
+            </button>
+            <button id="view-mode-side" type="button" class="px-2.5 py-1 rounded-md font-medium text-slate-400 hover:text-slate-200 transition" title="Side-by-side View">
+              Side-by-Side
+            </button>
+            <button id="view-mode-render" type="button" class="px-2.5 py-1 rounded-md font-medium text-slate-400 hover:text-slate-200 transition" title="Render View Only">
+              Render Only
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- MAIN PREVIEW CANVAS CONTAINER -->
+      <div class="flex-1 flex flex-col items-center justify-center min-h-[460px] relative rounded-2xl border border-zinc-800/80 bg-slate-900/40 p-4 overflow-hidden shadow-2xl">
+        
+        <!-- INITIAL EMPTY STATE -->
+        <div id="render-empty-state" class="text-center p-8 max-w-md">
+          <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-zinc-800/80 border border-zinc-700/80 flex items-center justify-center text-3xl shadow-inner">
+            ✨
+          </div>
+          <h3 class="text-base font-bold text-white mb-2">Ready for Packaging Synthesis</h3>
+          <p class="text-xs text-slate-400 leading-relaxed mb-4">
+            Upload your packaging sketch on the left or click one of the benchmark templates (Carton, Pouch, Bottle), configure your materials, and click <strong class="text-amber-400">"Generate Photoreal Mockup"</strong>.
+          </p>
+          <div class="inline-flex items-center gap-2 text-[11px] text-amber-300/80 bg-amber-500/10 px-3 py-1.5 rounded-full border border-amber-500/20">
+            <span>💡</span> Fast local mock inference mode enabled for zero-lag testing
+          </div>
+        </div>
+
+        <!-- ACTIVE GENERATION PROGRESS CARD (HIDDEN BY DEFAULT) -->
+        <div id="render-progress-card" class="hidden w-full max-w-lg p-6 rounded-2xl border border-amber-500/30 bg-slate-900/90 shadow-2xl backdrop-blur-xl flex flex-col gap-4 z-20">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+              <div class="w-3 h-3 rounded-full bg-amber-400 animate-ping"></div>
+              <span id="progress-stage-title" class="text-sm font-bold text-white">Synthesizing Packaging...</span>
+            </div>
+            <span id="progress-pct-badge" class="font-mono text-sm font-bold text-amber-400">0%</span>
+          </div>
+
+          <!-- Progress Bar -->
+          <div class="w-full bg-zinc-800 rounded-full h-2.5 overflow-hidden">
+            <div id="progress-bar-fill" class="bg-gradient-to-r from-amber-500 to-amber-300 h-2.5 rounded-full transition-all duration-300 w-0"></div>
+          </div>
+
+          <!-- Stage Stepper Indicator -->
+          <div class="grid grid-cols-4 gap-2 pt-2 text-[10px] uppercase font-bold tracking-wider text-center">
+            <div id="step-queued" class="p-1 rounded bg-zinc-800 text-slate-400 border border-zinc-700">1. Queued</div>
+            <div id="step-pre" class="p-1 rounded bg-zinc-800 text-slate-400 border border-zinc-700">2. Preprocess</div>
+            <div id="step-gen" class="p-1 rounded bg-zinc-800 text-slate-400 border border-zinc-700">3. Render</div>
+            <div id="step-post" class="p-1 rounded bg-zinc-800 text-slate-400 border border-zinc-700">4. Composite</div>
+          </div>
+
+          <p id="progress-stage-msg" class="text-xs text-slate-400 text-center font-mono">Initializing worker session...</p>
+        </div>
+
+        <!-- SPLIT COMPARISON SLIDER VIEW (REVEALED WHEN GENERATION COMPLETES) -->
+        <div id="slider-container" class="hidden relative w-full max-w-[620px] aspect-square rounded-xl overflow-hidden border border-zinc-800 shadow-2xl select-none group">
+          <!-- Left: Original Sketch Layer -->
+          <div class="comparison-layer absolute inset-0 w-full h-full bg-white flex items-center justify-center">
+            <img id="sketch-preview-img" class="w-full h-full object-contain pointer-events-none" alt="Original Sketch">
+            <span class="absolute top-3 left-3 px-2 py-0.5 rounded bg-slate-950/80 backdrop-blur-sm text-[10px] font-bold text-white border border-zinc-700 uppercase tracking-wider">
+              Original Sketch
+            </span>
+          </div>
+
+          <!-- Right: Rendered Mockup Layer (Clipped by slider position) -->
+          <div id="render-clip-layer" class="comparison-layer absolute inset-0 w-full h-full flex items-center justify-center" style="clip-path: polygon(50% 0, 100% 0, 100% 100%, 50% 100%);">
+            <img id="render-result-img" class="w-full h-full object-contain pointer-events-none" alt="Photoreal Render">
+            <span class="absolute top-3 right-3 px-2 py-0.5 rounded bg-amber-500/90 text-slate-950 text-[10px] font-extrabold uppercase tracking-wider shadow">
+              Photoreal Mockup
+            </span>
+          </div>
+
+          <!-- Divider Handle -->
+          <div id="slider-handle" class="absolute top-0 bottom-0 w-0.5 bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.8)] cursor-ew-resize z-20 flex items-center justify-center" style="left: 50%;">
+            <div class="w-8 h-8 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center shadow-lg font-bold text-xs border border-white">
+              ⇄
+            </div>
+          </div>
+        </div>
+
+        <!-- SIDE BY SIDE VIEW (OPTIONAL ALTERNATIVE) -->
+        <div id="side-by-side-container" class="hidden grid grid-cols-2 gap-4 w-full max-w-4xl">
+          <div class="relative aspect-square rounded-xl border border-zinc-800 bg-white overflow-hidden">
+            <img id="side-sketch-img" class="w-full h-full object-contain" alt="Original sketch">
+            <span class="absolute top-2 left-2 px-2 py-0.5 rounded bg-slate-950/80 text-[10px] font-bold text-white">Original Sketch</span>
+          </div>
+          <div class="relative aspect-square rounded-xl border border-zinc-800 bg-slate-900 overflow-hidden">
+            <img id="side-render-img" class="w-full h-full object-contain" alt="Photoreal render">
+            <span class="absolute top-2 right-2 px-2 py-0.5 rounded bg-amber-500 text-slate-950 text-[10px] font-bold">Photoreal Render</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- BOTTOM QUALITY METRICS & ACTION BAR -->
+      <div id="render-actions-panel" class="hidden flex flex-col gap-3 pt-4 border-t border-zinc-800/80 mt-4">
+        
+        <!-- Scorecard Badges -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <div class="p-2.5 rounded-lg bg-zinc-900/90 border border-zinc-800 flex flex-col">
+            <span class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Edge SSIM Fidelity</span>
+            <span id="metric-ssim-badge" class="font-mono text-sm font-bold text-emerald-400 mt-0.5">--</span>
+          </div>
+
+          <div class="p-2.5 rounded-lg bg-zinc-900/90 border border-zinc-800 flex flex-col">
+            <span class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">CLIP Alignment</span>
+            <span id="metric-clip-badge" class="font-mono text-sm font-bold text-amber-400 mt-0.5">--</span>
+          </div>
+
+          <div class="p-2.5 rounded-lg bg-zinc-900/90 border border-zinc-800 flex flex-col">
+            <span class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Contour IoU</span>
+            <span id="metric-iou-badge" class="font-mono text-sm font-bold text-cyan-400 mt-0.5">--</span>
+          </div>
+
+          <div class="p-2.5 rounded-lg bg-zinc-900/90 border border-zinc-800 flex flex-col">
+            <span class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Latency / Engine</span>
+            <span id="metric-latency-badge" class="font-mono text-sm font-bold text-slate-300 mt-0.5">--</span>
+          </div>
+        </div>
+
+        <!-- Action Download Buttons & Feedback -->
+        <div class="flex items-center justify-between flex-wrap gap-2 pt-1">
+          <div class="flex items-center gap-2">
+            <button id="btn-download-render" type="button" class="px-3.5 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-xs font-bold text-white transition flex items-center gap-1.5 shadow">
+              <svg class="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+              </svg>
+              Download High-Res Render (PNG)
+            </button>
+
+            <button id="btn-download-metadata" type="button" class="px-3 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-semibold text-slate-300 transition flex items-center gap-1.5">
+              <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+              </svg>
+              Metadata JSON
+            </button>
+          </div>
+
+          <button id="btn-open-feedback" type="button" class="px-3.5 py-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-xs font-bold text-amber-300 transition flex items-center gap-1.5">
+            <span>⭐</span> Rate & Review Mockup
+          </button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: 1-5 STAR DESIGN REVIEW & CRITERIA FEEDBACK                         -->
+  <!-- ========================================================================= -->
+  <div id="feedback-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+    <div class="bg-slate-900 border border-zinc-800 rounded-2xl max-w-md w-full p-6 shadow-2xl flex flex-col gap-4">
+      <div class="flex items-center justify-between pb-3 border-b border-zinc-800">
+        <div>
+          <h3 class="text-base font-bold text-white">Review Packaging Render</h3>
+          <p class="text-xs text-slate-400">Structured evaluation for quality benchmarks</p>
+        </div>
+        <button id="btn-close-feedback" class="text-slate-400 hover:text-white p-1 rounded-md">✕</button>
+      </div>
+
+      <!-- Star Rating Input -->
+      <div>
+        <label class="block text-xs font-semibold text-slate-300 mb-1.5">Overall Quality Rating</label>
+        <div id="star-rating-container" class="flex items-center gap-2 text-2xl cursor-pointer">
+          <span class="star-btn text-amber-400 transition hover:scale-110" data-val="1">★</span>
+          <span class="star-btn text-amber-400 transition hover:scale-110" data-val="2">★</span>
+          <span class="star-btn text-amber-400 transition hover:scale-110" data-val="3">★</span>
+          <span class="star-btn text-amber-400 transition hover:scale-110" data-val="4">★</span>
+          <span class="star-btn text-amber-400 transition hover:scale-110" data-val="5">★</span>
+          <span id="star-rating-label" class="text-xs font-bold text-slate-300 ml-2">5.0 / 5.0 (Outstanding)</span>
+        </div>
+      </div>
+
+      <!-- Criteria Evaluation Checkboxes -->
+      <div>
+        <label class="block text-xs font-semibold text-slate-300 mb-2">Quality Criteria Checklist</label>
+        <div class="grid grid-cols-1 gap-2 text-xs">
+          <label class="flex items-center gap-2 text-slate-300 cursor-pointer">
+            <input type="checkbox" id="crit-shape" checked class="rounded border-zinc-700 text-amber-500 focus:ring-0">
+            <span>Shape & dieline silhouette preserved accurately</span>
+          </label>
+          <label class="flex items-center gap-2 text-slate-300 cursor-pointer">
+            <input type="checkbox" id="crit-material" checked class="rounded border-zinc-700 text-amber-500 focus:ring-0">
+            <span>Substrate material texture looks authentic (pulp, glass, metal)</span>
+          </label>
+          <label class="flex items-center gap-2 text-slate-300 cursor-pointer">
+            <input type="checkbox" id="crit-finish" checked class="rounded border-zinc-700 text-amber-500 focus:ring-0">
+            <span>Print finish (foil sheen, spot UV, embossed) rendered realistically</span>
+          </label>
+          <label class="flex items-center gap-2 text-slate-300 cursor-pointer">
+            <input type="checkbox" id="crit-lighting" checked class="rounded border-zinc-700 text-amber-500 focus:ring-0">
+            <span>Lighting reflections & ambient contact shadows convincing</span>
+          </label>
+          <label class="flex items-center gap-2 text-slate-300 cursor-pointer">
+            <input type="checkbox" id="crit-logo" checked class="rounded border-zinc-700 text-amber-500 focus:ring-0">
+            <span>Logo compositing sharp without generative warping</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Textual Critique -->
+      <div>
+        <label for="feedback-comment" class="block text-xs font-semibold text-slate-300 mb-1">Designer Notes / Feedback</label>
+        <textarea id="feedback-comment" rows="2" class="w-full px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs text-slate-200 focus:border-amber-400 focus:outline-none" placeholder="e.g. Excellent gold hot foil reflections and tactile substrate texture..."></textarea>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-zinc-800">
+        <button id="btn-cancel-feedback" type="button" class="px-3.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-slate-300 transition">
+          Cancel
+        </button>
+        <button id="btn-submit-feedback" type="button" class="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 font-bold text-xs text-slate-950 transition shadow">
+          Submit Review
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- DRAWER: GENERATION RUN HISTORY                                            -->
+  <!-- ========================================================================= -->
+  <aside id="history-drawer" class="fixed top-[65px] right-0 bottom-0 w-80 bg-slate-900/95 border-l border-zinc-800 backdrop-blur-xl z-30 p-4 shadow-2xl transform translate-x-full transition-transform duration-300 flex flex-col">
+    <div class="flex items-center justify-between pb-3 border-b border-zinc-800 mb-3">
+      <div class="flex items-center gap-2">
+        <span class="text-base">🕒</span>
+        <h3 class="text-sm font-bold text-white uppercase tracking-wider">Generation History</h3>
+      </div>
+      <button id="btn-close-drawer" class="p-1 text-slate-400 hover:text-white rounded-md">✕</button>
+    </div>
+
+    <!-- History items list -->
+    <div id="history-items-list" class="flex-1 overflow-y-auto flex flex-col gap-2.5 custom-scrollbar pr-1">
+      <p id="history-empty-msg" class="text-xs text-slate-500 text-center py-8">
+        No generation runs yet.<br>Render your first mockup to see it logged here!
+      </p>
+    </div>
+  </aside>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- APPLICATION JAVASCRIPT -->
+  <script src="/static/app.js"></script>
+</body>
+</html>

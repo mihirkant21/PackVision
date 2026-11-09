@@ -1,0 +1,31 @@
+# Core Deep Learning & Diffusion
+torch>=2.2.0
+torchvision>=0.17.0
+diffusers>=0.27.0
+transformers>=4.38.0
+accelerate>=0.28.0
+peft>=0.10.0
+safetensors>=0.4.2
+
+# Image Processing & Preprocessing
+opencv-python>=4.8.0
+pillow>=10.0.0
+numpy>=1.24.0
+scikit-image>=0.22.0
+
+# Backend & Web Framework
+fastapi>=0.110.0
+uvicorn[standard]>=0.28.0
+pydantic>=2.6.0
+pydantic-settings>=2.2.0
+sqlalchemy>=2.0.0
+python-multipart>=0.0.9
+httpx>=0.27.0
+
+# UI Workbench
+gradio>=4.20.0
+
+# Configuration & Utilities
+pyyaml>=6.0.0
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
