@@ -25,11 +25,11 @@ venv/
 ENV/
 
 # PyTorch / Diffusers / Hugging Face cache
-models/checkpoints/
+models/checkpoints/*.pt
+models/checkpoints/*.bin
+models/checkpoints/*.safetensors
 models/controlnet/
-*.safetensors
 *.bin
-*.pt
 *.pth
 .cache/
 hf_cache/

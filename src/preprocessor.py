@@ -36,6 +36,11 @@ class PreprocessResult:
     padding: Tuple[int, int, int, int]  # top, bottom, left, right
     metadata: Dict[str, Any] = field(default_factory=dict)
 
+    @property
+    def depth_map(self) -> Image.Image:
+        """Alias for depth image."""
+        return self.depth
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert metadata to dictionary format."""
         return {

@@ -168,6 +168,7 @@ def run_generation(
     guidance_scale: float,
     controlnet_scale: float,
     seed: int,
+    engine_choice: str = "Custom Trained PackVisionNet (v1.0)",
     progress=gr.Progress(track_tqdm=True),
 ) -> Tuple[Any, str, str, str, str]:
     """Execute end-to-end rendering pipeline and return slider comparison + metrics."""
@@ -181,7 +182,10 @@ def run_generation(
     effective_seed = None if seed <= 0 else seed
 
     # 1. Pipeline Render
-    progress(0.3, desc=f"Preprocessing sketch geometry & synthesizing {material} substrate...")
+    use_custom = "Custom" in engine_choice
+    engine_mode = "custom" if use_custom else ("procedural" if "Procedural" in engine_choice else "sdxl")
+
+    progress(0.3, desc=f"Preprocessing sketch geometry & synthesizing {material} with {engine_choice}...")
     renderer = get_renderer()
 
     norm_category = category.lower().replace(" ", "_")
@@ -204,6 +208,8 @@ def run_generation(
         seed=effective_seed,
         num_inference_steps=int(steps),
         guidance_scale=float(guidance_scale),
+        use_custom_model=use_custom,
+        engine_mode=engine_mode,
     )
 
     final_render = render_result.image
@@ -255,7 +261,8 @@ def run_generation(
     ssim_label = f"Edge SSIM: {ssim_val:.3f} ({'Excellent' if ssim_val > 0.8 else 'Good' if ssim_val > 0.65 else 'Moderate'})"
     iou_label = f"Edge IoU: {iou_val:.3f}"
     clip_label = f"CLIP Alignment: {clip_val:.3f}"
-    latency_label = f"Time: {render_result.inference_time:.2f}s ({'Procedural PBR' if render_result.is_mock else 'SDXL ControlNet'})"
+    engine_display = render_result.metadata.get("engine", "PackVisionNet" if not render_result.is_mock else "Procedural PBR")
+    latency_label = f"Time: {render_result.inference_time:.2f}s ({engine_display})"
 
     # Gradio ImageSlider accepts (before, after) tuple
     slider_output = (orig_normalized, final_render)
@@ -479,7 +486,16 @@ with gr.Blocks(title="PackVision AI - Packaging Studio") as demo:
                     )
 
             # ADVANCED CONTROLS ACCORDION
-            with gr.Accordion("⚙️ Advanced Inference Parameters", open=False):
+            with gr.Accordion("⚙️ Advanced Inference Parameters & Model Engine", open=True):
+                engine_dropdown = gr.Dropdown(
+                    choices=[
+                        "Custom Trained PackVisionNet (v1.0)",
+                        "Procedural PBR Engine",
+                        "Stable Diffusion XL + ControlNet",
+                    ],
+                    value="Custom Trained PackVisionNet (v1.0)",
+                    label="🧠 AI Model Architecture",
+                )
                 with gr.Row():
                     steps_slider = gr.Slider(
                         minimum=10, maximum=50, value=30, step=1, label="Denoising Steps"
@@ -608,6 +624,7 @@ with gr.Blocks(title="PackVision AI - Packaging Studio") as demo:
             guidance_slider,
             controlnet_slider,
             seed_input,
+            engine_dropdown,
         ],
         outputs=[
             slider_output,
