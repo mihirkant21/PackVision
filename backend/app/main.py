@@ -1,6 +1,22 @@
+import os
+import sys
+import subprocess
+from pathlib import Path
+
+# Self-relauncher: if executed with global python lacking dependencies,
+# automatically delegate to the local project virtual environment (.venv).
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+_VENV_PYTHON = _PROJECT_ROOT / ".venv" / "Scripts" / "python.exe"
+if _VENV_PYTHON.exists() and Path(sys.executable).resolve() != _VENV_PYTHON.resolve():
+    try:
+        import fastapi
+        import uvicorn
+    except ImportError:
+        print(f"[PackVision AI] Delegating execution to virtual environment: {_VENV_PYTHON}")
+        sys.exit(subprocess.run([str(_VENV_PYTHON)] + sys.argv).returncode)
+
 import logging
 from contextlib import asynccontextmanager
-from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -86,10 +102,22 @@ def serve_workbench():
 
 if __name__ == "__main__":
     import uvicorn
+    import socket
 
+    target_port = settings.API_PORT
+    # Check if target port is occupied; if so, allocate next available port
+    for p in range(target_port, target_port + 20):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(0.5)
+            if s.connect_ex(("127.0.0.1", p)) != 0:
+                target_port = p
+                break
+        logger.warning(f"Port {p} is currently busy, testing next port...")
+
+    logger.info(f"Starting PackVision Server on http://{settings.API_HOST}:{target_port}")
     uvicorn.run(
         "backend.app.main:app",
         host=settings.API_HOST,
-        port=settings.API_PORT,
+        port=target_port,
         reload=settings.DEBUG,
     )

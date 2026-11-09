@@ -16,8 +16,22 @@ from __future__ import annotations
 
 import os
 import sys
-import time
+import subprocess
 from pathlib import Path
+
+# Self-relauncher: if executed with global python lacking dependencies,
+# automatically delegate to the local virtual environment.
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_VENV_PYTHON = _PROJECT_ROOT / ".venv" / "Scripts" / "python.exe"
+if _VENV_PYTHON.exists() and Path(sys.executable).resolve() != _VENV_PYTHON.resolve():
+    try:
+        import gradio
+        import cv2
+    except ImportError:
+        print(f"[PackVision AI] Redirecting execution to virtual environment: {_VENV_PYTHON}")
+        sys.exit(subprocess.run([str(_VENV_PYTHON)] + sys.argv).returncode)
+
+import time
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import gradio as gr
@@ -25,7 +39,7 @@ import numpy as np
 from PIL import Image, ImageOps
 
 # Ensure project root is in sys.path
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = _PROJECT_ROOT
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -637,13 +651,23 @@ with gr.Blocks(title="PackVision AI - Packaging Studio") as demo:
 
 
 if __name__ == "__main__":
-    port = int(os.getenv("GRADIO_SERVER_PORT", "7860"))
+    base_port = int(os.getenv("GRADIO_SERVER_PORT", "7860"))
     host = os.getenv("GRADIO_SERVER_NAME", "0.0.0.0")
-    print(f"Launching PackVision AI Gradio Workbench on http://{host}:{port}...")
-    demo.launch(
-        server_name=host,
-        server_port=port,
-        share=False,
-        theme=gr.themes.Base(primary_hue="amber", neutral_hue="slate"),
-        css=CUSTOM_CSS,
-    )
+    
+    # Gracefully scan for an available port if 7860 is bound
+    for trial_port in range(base_port, base_port + 15):
+        try:
+            print(f"Launching PackVision AI Gradio Workbench on http://{host}:{trial_port}...")
+            demo.launch(
+                server_name=host,
+                server_port=trial_port,
+                share=False,
+                theme=gr.themes.Base(primary_hue="amber", neutral_hue="slate"),
+                css=CUSTOM_CSS,
+            )
+            break
+        except OSError as e:
+            if "10048" in str(e) or "already in use" in str(e).lower() or "address already in use" in str(e).lower():
+                print(f"[PackVision AI] Port {trial_port} is already in use, trying port {trial_port + 1}...")
+                continue
+            raise
