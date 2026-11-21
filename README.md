@@ -17,9 +17,11 @@ PackVision AI is a visual prototyping system that bridges the gap between early 
 - **Specialized Print Finish Rendering:** Simulates optical properties of gold/silver hot-foil stamping, spot UV gloss varnish, 3D embossing, debossing, and iridescent holographic films.
 - **Two-Stage Brand Logo Compositor:** Prevents garbled AI text by perspective-warping flat vector artwork via 4-point homography and blending it with underlying surface luminance and micro-shadows.
 - **Asynchronous Job Worker & REST API:** Complete FastAPI backend with SQLite/PostgreSQL persistence, job polling (`queued` ➔ `preprocessing` ➔ `generating` ➔ `postprocessing` ➔ `completed`), and thumbnail caching.
+- **Job Cancellation, Crash Recovery & Rate Limiting:** Cooperative job cancellation at stage boundaries, automatic recovery of jobs orphaned by a server crash, retry caps for failed jobs, and per-IP sliding-window rate limiting on uploads/creates (10 req/min) and reads (120 req/min).
 - **Interactive Dual Workbench:**
   - **Web Studio UI:** Dark-mode luxury CPG interface with real-time before/after comparison slider, canvas brush, sample sketch loader, and multi-criteria feedback dialog.
   - **Gradio Studio:** Rapid ML experimentation workbench with parameter sliders and metric readouts.
+- **Hybrid Cloud Engine:** Auto-detects Gemini / OpenRouter / OpenAI image APIs and renders through the best configured provider, with graceful fallback to the local neural checkpoint or procedural PBR renderer when no cloud keys are present or the API call fails.
 - **Built-in Dual-Engine Execution:** Runs full SDXL + ControlNet on CUDA GPUs, and includes an intelligent procedural PBR packaging renderer fallback for instant execution on standard CPUs.
 
 ---
@@ -83,8 +85,8 @@ PackVision-AI/
 │   └── app_gradio.py
 ├── data/                            # Datasets & Samples
 │   ├── samples/                     # Sample packaging sketches & logos
-│   └── build_dataset.py             # Synthetic paired dataset generator
-├── configs/                         # Model training and inference configs
+│   ├── dataset_generator.py         # Synthetic paired dataset generator (CLI: --samples/--categories/--seed)
+│   └── repair_manifests.py          # Dataset manifest repair tool (dry-run default, --write)
 ├── docs/                            # Architecture & API documentation
 ├── storage/                         # Local asset storage (inputs, outputs, thumbs)
 ├── Dockerfile.backend               # Container definition
@@ -129,6 +131,47 @@ To run instantly on CPU with procedural PBR rendering:
 USE_MOCK_INFERENCE=true
 MODEL_DEVICE=cpu
 ```
+
+#### Configuration Reference
+
+Key environment variables (see [.env.example](.env.example) for the full list):
+
+| Variable | Purpose |
+| :--- | :--- |
+| `RENDER_ENGINE` | Engine selection: `cloud` \| `local` \| `auto` (auto uses cloud if keys are present, else local) |
+| `STABILITY_API_KEY` | Stability AI credentials for `stable-image/control/sketch` (purpose-built sketch→photoreal; tried **first** in the cloud chain when set; **~$0.05/image — billing/credits required**) |
+| `OPENAI_API_KEY` / `GEMINI_API_KEY` / `OPENROUTER_API_KEY` | Cloud provider credentials (never commit real keys) |
+| `CLOUD_IMAGE_PROVIDER` | Cloud image provider preference (`auto`, `huggingface`, `cloudflare`, `modelscope`, `stability`, `gemini`, `openrouter`, `openai`) |
+| `HF_SPACE` | HuggingFace ZeroGPU space used by the **free** render path (default `black-forest-labs/FLUX.1-Kontext-dev`; tried first, no key needed) |
+| `HF_TOKEN` | Optional HuggingFace token — raises the limited anonymous ZeroGPU quota |
+| `HF_ENABLED` | Set `false` to skip the free HuggingFace provider entirely (default `true`) |
+| `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` | Cloudflare Workers AI credentials for **free** img2img (`@cf/runwayml/stable-diffusion-v1-5-img2img`; free tier = 10,000 Neurons/day ≈ 20-30 images, no credit card). Tried after HuggingFace when both are set: dash.cloudflare.com → My Profile → API Tokens → Create Token (Workers AI template) + Account ID from the dashboard right sidebar |
+| `CLOUDFLARE_IMG2IMG_MODEL` / `CLOUDFLARE_STRENGTH` | Workers AI img2img model override (default `@cf/runwayml/stable-diffusion-v1-5-img2img`) and img2img strength (default `0.55`; an explicit conditioning_scale is mapped as `min(0.8, 0.35 + scale·0.35)`) |
+| `MODELSCOPE_API_TOKEN` / `MODELSCOPE_ENABLED` | ModelScope API-Inference Qwen-Image-Edit (free token from modelscope.cn → account → Access Tokens). **Dormant skeleton, disabled by default**: the REST image-edit endpoint requires a publicly hosted `image_url` (inline base64 unverified), so it stays off until hosted-input support lands |
+| `VLM_PROVIDER` | Vision-language model provider preference (`auto`, `gemini`, ...) |
+| `OPENROUTER_IMAGE_MODEL` | OpenRouter image model id (default `google/gemini-2.5-flash-image`) |
+| `OPENAI_IMAGE_MODEL` | OpenAI image model id (default `gpt-image-1`) |
+| `GEMINI_IMAGE_MODEL` | Gemini image model id (default `gemini-2.5-flash-image`) |
+| `GEMINI_VLM_MODEL` | Gemini VLM model used for evaluation/caption enrichment (default `gemini-2.5-flash`) |
+| `CORS_ORIGINS` | Comma-separated allow-list (unset or `*` allows all origins with credentials disabled) |
+| `RATE_LIMIT_UPLOADS_PER_MIN` / `RATE_LIMIT_GENERATIONS_PER_MIN` | Per-IP sliding-window limits on uploads and generation creates (default 10/min) |
+| `RATE_LIMIT_READ_PER_MIN` | Per-IP limit on read endpoints (default 120/min) |
+
+> **Cloud engine cost note:** cloud **image generation** is a paid API —
+> Stability AI's sketch control endpoint costs ~**$0.05/image** (billing/credits
+> required), OpenRouter requires an account balance (at least ~$1 credit) and OpenAI
+> requires pre-purchased credits/billing enabled; Gemini image generation is
+> likewise billed against your Google Cloud / AI Studio quota. **Free tiers:**
+> HuggingFace Flux Kontext (ZeroGPU, no key) renders in ~45s; sketches are
+> processed by HuggingFace's public inference service (anonymous quota is
+> limited — set `HF_TOKEN` to raise it). Cloudflare Workers AI img2img adds a
+> second free tier (10,000 Neurons/day ≈ 20-30 images, no credit card) — honest
+> caveat: SD1.5 img2img quality is below FLUX.1-Kontext, so it is a free
+> fallback tier, not the headline renderer. ModelScope's Qwen-Image-Edit is a
+> dormant, disabled-by-default skeleton (needs a hosted image URL). The **VLM
+> enrichment path** (evaluation captions, prompt provenance) works on the
+> **free Gemini tier**. Without any cloud credentials, `RENDER_ENGINE=auto`
+> falls back to the local engines and everything still runs offline.
 
 ### 3. Launching the Backend API
 Start the FastAPI server:

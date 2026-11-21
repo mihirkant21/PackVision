@@ -13,10 +13,27 @@ services:
       - APP_ENV=production
       - API_HOST=0.0.0.0
       - API_PORT=8000
+      # SQLite lives at /app/storage/packvision.db in the container,
+      # which is persisted by the ./storage volume mount below.
       - DATABASE_URL=sqlite:///./storage/packvision.db
       - STORAGE_PATH=./storage
       - USE_MOCK_INFERENCE=true
       - MAX_UPLOAD_MB=25
+      # Hybrid cloud engine passthrough (see .env.example)
+      - RENDER_ENGINE=${RENDER_ENGINE:-auto}
+      - CLOUD_IMAGE_PROVIDER=${CLOUD_IMAGE_PROVIDER:-auto}
+      - VLM_PROVIDER=${VLM_PROVIDER:-auto}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENROUTER_IMAGE_MODEL=${OPENROUTER_IMAGE_MODEL:-}
+      - OPENAI_IMAGE_MODEL=${OPENAI_IMAGE_MODEL:-}
+      - GEMINI_IMAGE_MODEL=${GEMINI_IMAGE_MODEL:-}
+      - GEMINI_VLM_MODEL=${GEMINI_VLM_MODEL:-}
+      - CORS_ORIGINS=${CORS_ORIGINS:-}
+      - RATE_LIMIT_UPLOADS_PER_MIN=${RATE_LIMIT_UPLOADS_PER_MIN:-}
+      - RATE_LIMIT_GENERATIONS_PER_MIN=${RATE_LIMIT_GENERATIONS_PER_MIN:-}
+      - RATE_LIMIT_READ_PER_MIN=${RATE_LIMIT_READ_PER_MIN:-}
     volumes:
       - ./storage:/app/storage
       - ./models:/app/models
@@ -37,6 +54,17 @@ services:
     environment:
       - USE_MOCK_INFERENCE=true
       - STORAGE_PATH=./storage
+      # Hybrid cloud engine passthrough (see .env.example)
+      - RENDER_ENGINE=${RENDER_ENGINE:-auto}
+      - CLOUD_IMAGE_PROVIDER=${CLOUD_IMAGE_PROVIDER:-auto}
+      - VLM_PROVIDER=${VLM_PROVIDER:-auto}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENROUTER_IMAGE_MODEL=${OPENROUTER_IMAGE_MODEL:-}
+      - OPENAI_IMAGE_MODEL=${OPENAI_IMAGE_MODEL:-}
+      - GEMINI_IMAGE_MODEL=${GEMINI_IMAGE_MODEL:-}
+      - GEMINI_VLM_MODEL=${GEMINI_VLM_MODEL:-}
     volumes:
       - ./storage:/app/storage
       - ./models:/app/models

@@ -113,10 +113,12 @@ class Generation(Base):
     negative_prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     seed: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     model_name: Mapped[str] = mapped_column(
-        String(100), default="SDXL-ControlNet-Packaging", nullable=False
+        # Neutral pending-label; overwritten with the engine that actually
+        # rendered (e.g. "packvisionnet-v2", "cloud-gemini") on completion.
+        String(100), default="pending-engine-selection", nullable=False
     )
     model_revision: Mapped[str] = mapped_column(
-        String(50), default="v1.0.0", nullable=False
+        String(50), default="unspecified", nullable=False
     )
     parameters_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
     progress: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

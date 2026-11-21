@@ -1,10 +1,19 @@
-# Python
+# =============================================================================
+# PackVision AI - Comprehensive .gitignore for GitHub
+# =============================================================================
+
+# Python Bytecode & Cache
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+
+# Environments
 env/
+venv/
+.venv/
+ENV/
 build/
 develop-eggs/
 dist/
@@ -20,45 +29,82 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-venv/
-.venv/
-ENV/
 
-# PyTorch / Diffusers / Hugging Face cache
+# Testing & Linters
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.tox/
+.nox/
+
+# PyTorch / Diffusers / Large Deep Learning Model Weights (>100MB fails GitHub push)
 models/checkpoints/*.pt
+models/checkpoints/*.pth
 models/checkpoints/*.bin
 models/checkpoints/*.safetensors
+models/checkpoints/*.ckpt
+models/checkpoints/*.onnx
 models/controlnet/
-*.bin
+*.pt
 *.pth
+*.bin
+*.safetensors
+*.ckpt
+*.onnx
 .cache/
 hf_cache/
 
-# Storage & Uploads
+# Storage & Uploads (preserve folder structure with .gitkeep)
 storage/inputs/*
 !storage/inputs/.gitkeep
 storage/outputs/*
 !storage/outputs/.gitkeep
 storage/thumbnails/*
 !storage/thumbnails/.gitkeep
-packvision.db
-*.sqlite3
+storage/cloud_provider_state.json
+storage/research/
+storage/*.log
 
-# Node / Frontend
+# Databases
+packvision.db
+*.sqlite
+*.sqlite3
+*.db
+
+# Large Generated Dataset Images (re-generated via data/dataset_generator.py)
+data/dataset/train/
+data/dataset/val/
+data/dataset/*.png
+data/dataset/metadata.jsonl
+
+# Scratch, Test Renders & Logs
+/temp_render_*.png
+/test_3d_*.png
+/or_models_temp.json
+test_render_*.png
+*.log
+
+# Node & Web
 node_modules/
 .next/
 out/
-build/
 .npm
 
-# IDE / OS
+# IDEs & Operating Systems
 .idea/
 .vscode/
+.zcode/
 *.swp
 *.swo
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Environment variables
+# Environment Variables & Secrets (NEVER push API keys)
 .env
+.env.*
 .env.local
+!.env.example

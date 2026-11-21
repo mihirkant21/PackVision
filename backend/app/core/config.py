@@ -33,6 +33,21 @@ class Settings(BaseSettings):
     VAE_MODEL: str = "madebyollin/sdxl-vae-fp16-fix"
     LORA_WEIGHTS_PATH: str = ""
 
+    # Hybrid Render Engine (cloud-first rendering with local fallback)
+    RENDER_ENGINE: str = "auto"  # "cloud" | "local" | "auto" (cloud first, local fallback)
+    RENDER_ENGINE_CLOUD_PROVIDER: str = "auto"  # "gemini" | "openrouter" | "openai" | "auto"
+    CLOUD_IMAGE_PROVIDER: str = "auto"  # alias of RENDER_ENGINE_CLOUD_PROVIDER
+    OPENAI_API_KEY: str = ""
+    GEMINI_API_KEY: str = ""
+    OPENROUTER_API_KEY: str = ""
+    OPENROUTER_IMAGE_MODEL: str = "google/gemini-2.5-flash-image"
+    OPENAI_IMAGE_MODEL: str = "gpt-image-1"
+    GEMINI_IMAGE_MODEL: str = "gemini-2.5-flash-image"
+    GEMINI_VLM_MODEL: str = "gemini-3.8-flash"
+    OPENROUTER_VLM_MODEL: str = "nvidia/nemotron-3.5-super-vl:free"
+    OPENAI_VLM_MODEL: str = "gpt-4o-mini"
+    VLM_PROVIDER: str = "auto"  # "gemini" | "openrouter" | "openai" | "auto"
+
     # Image Validation
     ALLOWED_IMAGE_TYPES: List[str] = [
         "image/jpeg",

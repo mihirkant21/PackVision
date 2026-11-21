@@ -38,6 +38,14 @@ class GenerationCreate(BaseModel):
     negative_prompt: Optional[str] = Field(
         default=None, description="Elements to exclude from rendering"
     )
+    input_mode: str = Field(
+        default="auto",
+        pattern="^(auto|sketch|photo)$",
+        description=(
+            "Input treatment: 'auto' detects photo vs sketch, 'sketch' forces "
+            "line-art handling, 'photo' treats the upload as a real product photo"
+        ),
+    )
     seed: Optional[int] = Field(default=None, description="Random seed for reproducibility")
     num_outputs: int = Field(
         default=1, ge=1, le=4, description="Number of candidate variations to generate"

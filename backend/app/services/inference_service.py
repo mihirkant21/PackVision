@@ -72,6 +72,7 @@ class InferenceService:
         guidance_scale: float = 7.5,
         controlnet_scale: float = 0.85,
         steps: int = 30,
+        input_mode: str = "auto",
         progress_callback: Optional[Callable[[int, str], None]] = None,
     ) -> List[Dict[str, Any]]:
         """Execute end-to-end rendering pipeline.
@@ -97,6 +98,41 @@ class InferenceService:
         viewpoint_norm = (viewpoint or "three_quarter").lower().replace(" ", "_")
         background_norm = (background or "seamless_studio").lower().replace(" ", "_")
 
+        # Reference image -> one-sentence style hint via the shared VLM client.
+        # When no VLM provider is configured, a static directional hint is used so
+        # the reference still influences the render.
+        reference_style_hint = ""
+        reference_used = False
+        if reference_image_path and Path(reference_image_path).exists():
+            reference_used = True
+            try:
+                ref_img = Image.open(reference_image_path).convert("RGB")
+                hint = ""
+                try:
+                    from src.vlm_client import describe_image
+
+                    hint = describe_image(
+                        ref_img,
+                        "Describe the material, color palette and finish of this packaging "
+                        "reference image in one sentence.",
+                    )
+                except Exception as vlm_err:
+                    logger.warning(f"VLM reference description failed: {vlm_err}")
+                reference_style_hint = (hint or "").strip() or (
+                    "Design direction inspired by the provided reference swatch."
+                )
+                logger.info(f"Reference style hint: {reference_style_hint}")
+            except Exception as ref_err:
+                logger.warning(f"Could not read reference image {reference_image_path}: {ref_err}")
+                reference_style_hint = ""
+                reference_used = False
+
+        effective_user_prompt = user_prompt
+        if reference_style_hint:
+            effective_user_prompt = (
+                f"{user_prompt or ''} Reference style hint: {reference_style_hint}"
+            ).strip()
+
         results = []
 
         for i in range(num_outputs):
@@ -115,12 +151,13 @@ class InferenceService:
                     lighting="studio softbox",
                     camera_angle=viewpoint_norm,
                     background=background_norm,
-                    user_prompt=user_prompt,
+                    user_prompt=effective_user_prompt,
                     negative_prompt=negative_prompt,
                     seed=current_seed,
                     num_inference_steps=steps,
                     guidance_scale=guidance_scale,
                     controlnet_scale=controlnet_scale,
+                    input_mode=input_mode,
                 )
 
                 rendered_img = render_result.image
@@ -162,13 +199,14 @@ class InferenceService:
                     except Exception as logo_err:
                         logger.warning(f"Logo compositing notice: {logo_err}")
 
-                # 3. Quality Evaluation Metrics
+                # 3. Quality Evaluation Metrics (honest values: None when the
+                #    evaluator is unavailable, never fabricated placeholders)
                 if progress_callback:
                     progress_callback(90, "Evaluating structural fidelity and SSIM metrics...")
 
-                ssim_score = 0.885
-                iou_score = 0.680
-                clip_score = 0.315
+                ssim_score = None
+                iou_score = None
+                clip_score = None
                 try:
                     from src.evaluation import compute_edge_ssim, compute_edge_iou
                     ssim_score = compute_edge_ssim(sketch_pil, rendered_img)
@@ -179,16 +217,30 @@ class InferenceService:
                 except Exception as eval_err:
                     logger.debug(f"Evaluation metrics calculation: {eval_err}")
 
+                metrics_available = (
+                    ssim_score is not None or iou_score is not None or clip_score is not None
+                )
+                renderer_meta = getattr(render_result, "metadata", {}) or {}
+
                 metrics = {
-                    "edge_ssim": round(float(ssim_score), 4),
-                    "edge_iou": round(float(iou_score), 4),
-                    "clip_score": round(float(clip_score), 4),
+                    "edge_ssim": round(float(ssim_score), 4) if ssim_score is not None else None,
+                    "edge_iou": round(float(iou_score), 4) if iou_score is not None else None,
+                    "clip_score": round(float(clip_score), 4) if clip_score is not None else None,
+                    "metrics_available": metrics_available,
+                    "metrics_source": "computed" if metrics_available else "unavailable",
                     "inference_time_ms": round(float(render_result.inference_time * 1000.0), 2),
                     "seed": current_seed,
                     "package_type": category_norm,
                     "material": material_norm,
                     "finish": finish_norm,
-                    "engine": render_result.metadata.get("engine", "PackVisionNet"),
+                    "engine": renderer_meta.get("engine", "PackVisionNet"),
+                    "engine_used": renderer_meta.get(
+                        "engine_used", renderer_meta.get("engine", "unknown")
+                    ),
+                    "engine_latency_s": renderer_meta.get("engine_latency_s"),
+                    "engine_note": renderer_meta.get("engine_note", ""),
+                    "input_mode": renderer_meta.get("input_mode", "auto"),
+                    "reference_used": reference_used,
                     "is_mock": render_result.is_mock,
                 }
 
@@ -204,12 +256,16 @@ class InferenceService:
                 results.append({
                     "image": fallback_img,
                     "metrics": {
-                        "edge_ssim": 0.85,
-                        "edge_iou": 0.60,
-                        "clip_score": 0.28,
+                        "edge_ssim": None,
+                        "edge_iou": None,
+                        "clip_score": None,
+                        "metrics_available": False,
+                        "metrics_source": "unavailable",
                         "inference_time_ms": 120.0,
                         "seed": current_seed,
                         "engine": "Emergency Fallback",
+                        "engine_used": "emergency-fallback",
+                        "reference_used": reference_used,
                         "is_mock": True,
                     },
                 })
@@ -227,5 +283,30 @@ class InferenceService:
         blended = Image.blend(tinted, sketch_resized, 0.45)
         return blended
 
+    def get_engine_status(self) -> Dict[str, Any]:
+        """Probe cloud render engine availability (for health/admin endpoints).
+
+        Returns the CloudRenderEngine.probe() report:
+        {provider: {"configured": bool, "last_error": str|None, "status": "ready"|"cooldown"|"missing_key"}}
+        """
+        try:
+            from src.cloud_engine import CloudRenderEngine
+
+            return CloudRenderEngine().probe()
+        except Exception as status_err:
+            logger.warning(f"Cloud engine probe failed: {status_err}")
+            return {
+                "gemini": {"configured": False, "last_error": str(status_err), "status": "missing_key"},
+                "openrouter": {"configured": False, "last_error": None, "status": "missing_key"},
+                "openai": {"configured": False, "last_error": None, "status": "missing_key"},
+                "error": str(status_err),
+            }
+
 
 inference_service = InferenceService()
+
+
+def get_engine_status() -> Dict[str, Any]:
+    """Module-level helper (used by API/health endpoints and other services):
+    probe cloud render engine availability via the shared inference service."""
+    return inference_service.get_engine_status()

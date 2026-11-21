@@ -1,4 +1,5 @@
 import io
+import os
 import tempfile
 import pytest
 from pathlib import Path
@@ -6,6 +7,30 @@ from PIL import Image
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+
+# --- Test-process environment (MUST run before any backend.app import) -----
+# 1. PACKVISION_TESTING: main.py lifespan teardown checks this flag and skips
+#    job_service.executor.shutdown(); without it, the shared singleton
+#    executor is poisoned after the first TestClient teardown and every
+#    subsequent job submission raises
+#    "RuntimeError: cannot schedule new futures after shutdown".
+os.environ["PACKVISION_TESTING"] = "1"
+# 2. RENDER_ENGINE=local: skips the multi-second cloud provider discovery in
+#    the inference layer (triggered when real provider keys are present in
+#    .env), which otherwise collides with the 10s lifecycle poll budget.
+#    Restored after the session so sibling test files in the same process are
+#    not poisoned (raw os.environ writes persist without monkeypatch).
+os.environ["RENDER_ENGINE"] = "local"
+_original_render_engine = os.environ.get("RENDER_ENGINE")
+
+
+def pytest_unconfigure(config):
+    # Restore whatever the process had before this conftest ran.
+    if _original_render_engine is None:
+        os.environ.pop("RENDER_ENGINE", None)
+    else:
+        os.environ["RENDER_ENGINE"] = _original_render_engine
+# ----------------------------------------------------------------------------
 
 from backend.app.core.config import settings
 from backend.app.db.models import Base, User
@@ -93,6 +118,30 @@ def client(test_engine, db_session):
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def disable_rate_limiting():
+    """Disable the in-memory rate limiters for the duration of each test.
+
+    Rate limiting state is process-global and keyed by client IP ("testclient"
+    for TestClient), so without this fixture the shared buckets would bleed
+    across tests and 429-flake the suite. Tests that verify 429 behavior
+    re-enable their limiter instance locally (see test_job_lifecycle.py).
+    """
+    from backend.app.core import rate_limit
+
+    limiters = (
+        rate_limit.upload_limiter,
+        rate_limit.generation_create_limiter,
+        rate_limit.read_limiter,
+    )
+    saved = [(limiter, limiter.enabled) for limiter in limiters]
+    for limiter in limiters:
+        limiter.enabled = False
+    yield
+    for limiter, state in saved:
+        limiter.enabled = state
 
 
 @pytest.fixture

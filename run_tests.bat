@@ -14,7 +14,7 @@ if exist ".venv\Scripts\python.exe" (
 
 echo [*] Running Pytest test suite using %PYTHON_CMD%...
 echo.
-%PYTHON_CMD% -m pytest backend/tests -v
+%PYTHON_CMD% -m pytest backend/tests tests -v
 echo.
 echo =======================================================================
 echo All tests executed.

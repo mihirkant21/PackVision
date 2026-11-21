@@ -1,47 +1,351 @@
-/* PackVision AI - Luxury Packaging Studio Stylesheet */
+/* ==========================================================================
+   PackVision — minimal Pinterest-style stylesheet (light + dark)
+   --------------------------------------------------------------------------
+   Works alongside the self-hosted Tailwind build loaded in index.html
+   (darkMode: "class" — the `dark` class on <html> is toggled by app.js).
+
+   Design language: pure white page, hairline #E9E9E9 borders only where
+   necessary, #F1F1F1 field fills, 11px muted labels, one red accent
+   (#E60023). No card boxes, no shadows at rest except the render image.
+
+   This file also NEUTRALIZES className strings that app.js hardcodes
+   (status pill, stepper pills, view-mode pills, history cards) via
+   ID/class-scoped overrides — those elements must stay in the DOM with
+   the IDs app.js wires, but are restyled here.
+   ========================================================================== */
 
 :root {
-  --bg-main: #060911;
-  --bg-card: rgba(15, 23, 42, 0.7);
-  --border-card: rgba(39, 39, 42, 0.8);
-  --gold-primary: #f59e0b;
-  --gold-secondary: #d4af37;
-  --gold-glow: rgba(245, 158, 11, 0.25);
-  --text-primary: #f8fafc;
-  --text-muted: #94a3b8;
+  --bg-page: #ffffff;
+  --bg-surface: #fafafa;
+  --bg-field: #f1f1f1;
+  --bg-elevated: #ffffff;
+  --border: #e9e9e9;
+  --accent: #e60023;
+  --accent-hover: #c80018;
+  --text-primary: #171717;
+  --text-muted: #767676;
+  --text-faint: #9b9b9b;
+  /* Native form controls (selects, checkboxes, scrollbars) follow the theme and
+     re-resolve when it flips — Chromium keeps a stale computed background on
+     appearance:auto controls when only an ancestor class changes otherwise. */
+  color-scheme: light;
 }
 
-/* Custom Scrollbar */
+/* Dark theme design tokens (JS toggles `dark` on <html>) */
+.dark {
+  --bg-page: #111111;
+  --bg-surface: #1c1c1c;
+  --bg-field: #262626;
+  --bg-elevated: #1c1c1c;
+  --border: #333333;
+  --accent: #e60023;
+  --accent-hover: #c80018;
+  --text-primary: #f5f5f5;
+  --text-muted: #a8a8a8;
+  --text-faint: #8a8a8a;
+  color-scheme: dark;
+}
+
+/* ---- Critical visibility utilities (JS show/hide contract) ---- */
+.hidden {
+  display: none !important;
+}
+.translate-x-full {
+  transform: translateX(100%);
+}
+
+/* ---- Scrollbars ---- */
 .custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.4);
+  background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(71, 85, 105, 0.6);
+  background: #e0e0e0;
   border-radius: 9999px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(212, 175, 55, 0.6);
+  background: #c9c9c9;
+}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #333333;
+}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #444444;
 }
 
-/* Card aesthetics */
-.studio-card {
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+/* ---- Tiny section labels (11px muted, sentence case — no ALL CAPS) ---- */
+.section-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  line-height: 1.4;
 }
-.studio-card:hover {
-  border-color: rgba(212, 175, 55, 0.3);
+.control-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+  line-height: 1.4;
 }
 
-/* Drop Zone pulse */
+/* ---- Fields: borderless, #F1F1F1 fill, red focus ring ---- */
+.field {
+  width: 100%;
+  background: var(--bg-field);
+  color: var(--text-primary);
+  border: 0;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  font-family: inherit;
+  outline: none;
+  transition: box-shadow 0.15s ease;
+}
+.field::placeholder {
+  color: var(--text-faint);
+}
+.field:focus {
+  box-shadow: 0 0 0 2px rgba(230, 0, 35, 0.3);
+}
+select.field {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 30px;
+  cursor: pointer;
+}
+.select-wrap {
+  position: relative;
+}
+.select-caret {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+/* ---- Quiet text buttons (Metadata, Rate & review, Cancel, sample logo) ---- */
+.quiet-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.quiet-btn:hover {
+  color: var(--text-primary);
+}
+.quiet-btn:focus-visible {
+  outline: 2px solid rgba(230, 0, 35, 0.4);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ---- Benchmark sketch buttons: plain text separated by dots ---- */
+.sample-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.sample-btn:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+.sample-btn:focus-visible {
+  outline: 2px solid rgba(230, 0, 35, 0.4);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ---- Re-detect: quiet 11px text button beside the "Input type" label ---- */
+.redetect-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.redetect-btn:hover {
+  color: var(--text-primary);
+}
+.redetect-btn:disabled {
+  color: var(--text-faint);
+  opacity: 0.6;
+  cursor: default;
+}
+.redetect-btn:focus-visible {
+  outline: 2px solid rgba(230, 0, 35, 0.4);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ---- Auto-detect status line (#detect-status, under the Input type select).
+   Three quiet states, toggled by app.js:
+   --detecting  "Detecting configuration" + CSS-animated dots
+   --ok         "Detected: stand up pouch · flexible mylar · matte"
+   --fail       "Auto-detect unavailable — settings kept" (auto-clears)
+   An empty element collapses (no reserved space) via :empty. ---- */
+.detect-status {
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+.detect-status:empty {
+  display: none;
+}
+.detect-status--detecting,
+.detect-status--fail {
+  color: var(--text-faint);
+}
+.detect-status--detecting::after {
+  content: "…";
+  display: inline-block;
+  animation: detectDots 1.4s infinite;
+}
+@keyframes detectDots {
+  0%, 24% {
+    content: "";
+  }
+  25%, 49% {
+    content: ".";
+  }
+  50%, 74% {
+    content: "..";
+  }
+  75%, 100% {
+    content: "...";
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .detect-status--detecting::after {
+    content: "…";
+    animation: none;
+  }
+}
+
+/* ---- Icon-only buttons (header theme toggle, drawer/modal close) ---- */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.icon-btn:hover {
+  background: var(--bg-field);
+  color: var(--text-primary);
+}
+
+/* ---- Canvas tool buttons: icon-only, selected state via the radio input ---- */
+.tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.tool-btn:hover {
+  background: var(--bg-field);
+  color: var(--text-primary);
+}
+.tool-btn input:checked + svg {
+  color: var(--text-primary);
+}
+.tool-btn:has(input:checked) {
+  background: var(--bg-field);
+  color: var(--text-primary);
+}
+
+/* ---- Online status: dot + text only. app.js re-applies a bordered pill
+   className on every health check; strip the chrome back off. ---- */
+#backend-status-badge {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  font-size: 12px;
+  font-weight: 500;
+}
+/* The dot inherits the state color app.js sets (green online / red offline) */
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background: currentColor;
+  flex: none;
+}
+
+/* ---- Stepper: app.js assigns plain text state classes per stage
+   (idle gray / active dark / done green). Strip any pill chrome so the
+   steps read as a quiet text line; state colors come from app.js. ---- */
+#render-progress-card [id^="step-"] {
+  background: transparent !important;
+  border: 0 !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
+
+/* ---- View-mode segmented control: app.js puts shadow-sm on the active
+   pill; keep it flat. ---- */
+#view-mode-split[class*="shadow-sm"],
+#view-mode-side[class*="shadow-sm"],
+#view-mode-render[class*="shadow-sm"] {
+  box-shadow: none !important;
+}
+
+/* ---- Drop zone drag state (tints the quiet surface red) ---- */
 .drop-zone.dragover {
-  border-color: #f59e0b !important;
-  background-color: rgba(245, 158, 11, 0.05) !important;
+  background-color: #fff1f2 !important;
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.dark .drop-zone.dragover {
+  background-color: rgba(230, 0, 35, 0.12) !important;
 }
 
-/* Split slider interaction */
+/* ---- Sketch canvas: always white so white-background line art reads true ---- */
+#sketch-canvas {
+  background-color: #ffffff;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* ---- Split comparison slider ---- */
 #slider-container {
   touch-action: none;
 }
@@ -53,21 +357,203 @@
   cursor: ew-resize;
 }
 
-/* Star rating interactive hover */
+/* ---- Star rating ---- */
 .star-btn {
+  display: inline-flex;
   user-select: none;
   cursor: pointer;
   transition: transform 0.15s ease, color 0.15s ease;
 }
 .star-btn:hover {
-  transform: scale(1.2);
+  transform: scale(1.15);
 }
 
-/* Toast animations */
+/* ---- History drawer: image-first 2-column grid, no bordered cards.
+   app.js hardcodes a horizontal bordered-card className per item —
+   overridden here (the IDs/classes stay for JS). ---- */
+#history-items-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-content: start;
+}
+.history-item {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 6px !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  cursor: pointer;
+  min-width: 0;
+}
+.history-item:hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+.history-item:hover img {
+  opacity: 0.88;
+}
+.history-item img {
+  width: 100% !important;
+  height: auto !important;
+  aspect-ratio: 1 / 1;
+  object-fit: cover !important;
+  border-radius: 12px !important;
+  border: 0 !important;
+  padding: 0 !important;
+  background: var(--bg-surface);
+  transition: opacity 0.15s ease;
+}
+.history-item .flex-1 {
+  flex: none !important;
+  min-width: 0;
+}
+
+/* History status labels: tiny colored dot + text (emitted by app.js) */
+.history-status-done,
+.history-status-failed,
+.history-status-running,
+.history-status-queued {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.history-status-done::before,
+.history-status-failed::before,
+.history-status-running::before,
+.history-status-queued::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background: currentColor;
+  flex: none;
+}
+.history-status-done {
+  color: #16a34a;
+}
+.history-status-failed {
+  color: #dc2626;
+}
+.history-status-running {
+  color: #d97706;
+}
+.history-status-queued {
+  color: var(--text-faint);
+}
+.dark .history-status-done {
+  color: #4ade80;
+}
+.dark .history-status-failed {
+  color: #f87171;
+}
+.dark .history-status-running {
+  color: #fbbf24;
+}
+.dark .history-status-queued {
+  color: #737373;
+}
+
+/* ---- Engine attribution: plain 11px gray text, not a banner box ---- */
+.engine-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+.engine-banner-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+.engine-banner-gear {
+  display: inline-flex;
+  color: var(--text-faint);
+}
+.engine-banner-note {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--accent);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  white-space: nowrap;
+}
+.dark .engine-banner-note {
+  color: #fb7185;
+}
+
+/* ---- "(estimate)" provenance tag (contract class; kept quiet) ---- */
+.estimate-tag {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: var(--bg-field);
+  border: 0;
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+/* ---- Metrics "Details" collapsed row ---- */
+.metrics-details summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  font-size: 11px;
+  color: var(--text-muted);
+  transition: color 0.15s ease;
+}
+/* When expanded, wrap onto its own full-width line under the action buttons */
+.metrics-details[open] {
+  flex-basis: 100%;
+}
+.metrics-details summary::-webkit-details-marker {
+  display: none;
+}
+.metrics-details summary:hover,
+.metrics-details[open] summary {
+  color: var(--text-primary);
+}
+.metrics-details summary:focus-visible {
+  outline: 2px solid rgba(230, 0, 35, 0.4);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.metrics-details[open] summary {
+  margin-bottom: 2px;
+}
+
+/* ---- Cards (contract class): no boxes, no hover lift ---- */
+.studio-card {
+  background: transparent;
+  border: 0;
+}
+.studio-card:hover {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+/* ---- Toasts (app.js builds the markup): keep the slide-in only;
+   its own minimal classes handle the rest ---- */
 .toast-msg {
   animation: toastSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
-
 @keyframes toastSlideIn {
   from {
     opacity: 0;
@@ -79,33 +565,45 @@
   }
 }
 
-/* Shimmer on generate button */
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
+/* ---- Modal fade-in ---- */
 .animate-fade-in {
   animation: fadeIn 0.2s ease-out forwards;
 }
-
 @keyframes fadeIn {
-  from { opacity: 0; transform: scale(0.98); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
-/* Canvas styling */
-#sketch-canvas {
-  background-color: #ffffff;
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
+/* ---- Native control theming in dark mode ---- */
+.dark select option {
+  background-color: #1c1c1c;
+  color: #f5f5f5;
 }
 
-/* History item thumbnail */
-.history-item {
-  transition: all 0.2s ease;
+/* ---- Focus visibility for interactive chrome (fields use the red ring) ---- */
+button:focus-visible,
+a:focus-visible,
+summary:focus-visible {
+  outline: 2px solid rgba(230, 0, 35, 0.4);
+  outline-offset: 2px;
 }
-.history-item:hover {
-  transform: translateY(-2px);
-  border-color: rgba(212, 175, 55, 0.4);
+.field:focus-visible {
+  outline: none;
+}
+
+/* ---- Reduced motion ---- */
+@media (prefers-reduced-motion: reduce) {
+  .toast-msg,
+  .animate-fade-in {
+    animation: none;
+  }
+  * {
+    transition-duration: 0.01ms !important;
+  }
 }

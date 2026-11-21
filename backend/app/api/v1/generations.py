@@ -15,7 +15,12 @@ from backend.app.schemas.generation import (
 )
 from backend.app.schemas.asset import AssetResponse
 from backend.app.schemas.feedback import FeedbackCreate, FeedbackResponse
-from backend.app.services.job_service import job_service
+from backend.app.services.job_service import job_service, RetryLimitExceeded
+from backend.app.services.job_service import TERMINAL_STATES
+from backend.app.core.rate_limit import (
+    rate_limit_generation_create,
+    rate_limit_read,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +102,9 @@ def create_generation(
     payload: GenerationCreate,
     user_id: Optional[str] = Query(None, description="Optional requesting user ID"),
     db: Session = Depends(get_db),
+    # Rate limit: 10 generation creations per minute per IP (env-overridable
+    # via RATE_LIMIT_GENERATIONS_PER_MIN). 429 + Retry-After when exhausted.
+    _rate_limit: None = Depends(rate_limit_generation_create),
 ) -> GenerationResponse:
     # 1. Validate input asset
     input_asset = (
@@ -145,6 +153,7 @@ def create_generation(
         "controlnet_scale": payload.controlnet_scale,
         "steps": payload.steps,
         "logo_placement": payload.logo_placement,
+        "input_mode": payload.input_mode,
     }
 
     effective_user_id = user_id or DEFAULT_SYSTEM_USER_ID
@@ -188,6 +197,9 @@ def list_generations(
     offset: int = Query(0, ge=0, description="Offset for pagination"),
     status_filter: Optional[str] = Query(None, alias="status", description="Filter by status"),
     db: Session = Depends(get_db),
+    # Rate limit: 120 read requests per minute per IP (env-overridable via
+    # RATE_LIMIT_READ_PER_MIN). 429 + Retry-After when exhausted.
+    _rate_limit: None = Depends(rate_limit_read),
 ) -> GenerationListResponse:
     query = db.query(Generation)
     if status_filter:
@@ -221,6 +233,8 @@ def list_generations(
 def get_generation(
     generation_id: str,
     db: Session = Depends(get_db),
+    # Rate limit: 120 read requests per minute per IP.
+    _rate_limit: None = Depends(rate_limit_read),
 ) -> GenerationResponse:
     gen = (
         db.query(Generation)
@@ -257,7 +271,14 @@ def retry_generation(
             detail=f"Generation job '{generation_id}' not found.",
         )
 
-    retried_gen = job_service.retry_generation(db, generation_id)
+    try:
+        retried_gen = job_service.retry_generation(db, generation_id)
+    except RetryLimitExceeded as exc:
+        # Retry cap: max 3 retries per job (persisted in parameters_json).
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        )
     if not retried_gen:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -274,6 +295,56 @@ def retry_generation(
         created_at=retried_gen.created_at,
         started_at=retried_gen.started_at,
         completed_at=retried_gen.completed_at,
+    )
+
+
+@router.post(
+    "/generations/{generation_id}/cancel",
+    response_model=JobStatusResponse,
+    summary="Cancel a queued or running generation job",
+    description=(
+        "Requests cooperative cancellation. The background worker stops at the "
+        "next stage boundary and the job transitions to the terminal 'cancelled' "
+        "state. Returns 409 if the job is already in a terminal state."
+    ),
+)
+def cancel_generation(
+    generation_id: str,
+    db: Session = Depends(get_db),
+) -> JobStatusResponse:
+    gen = db.query(Generation).filter(Generation.id == generation_id).first()
+    if not gen:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Generation job '{generation_id}' not found.",
+        )
+
+    if gen.status in TERMINAL_STATES:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Generation job '{generation_id}' is already in terminal state "
+                f"'{gen.status}' and cannot be cancelled."
+            ),
+        )
+
+    # Sets the cooperative cancel flag; the worker honors it at the next
+    # stage boundary and marks the job 'cancelled'. The response carries the
+    # current DB status, which may briefly remain active until the worker
+    # observes the flag.
+    job_service.cancel_job(generation_id)
+    db.refresh(gen)
+
+    return JobStatusResponse(
+        id=gen.id,
+        status=gen.status,
+        progress=gen.progress,
+        stage_message=gen.stage_message,
+        error_code=gen.error_code,
+        error_message=gen.error_message,
+        created_at=gen.created_at,
+        started_at=gen.started_at,
+        completed_at=gen.completed_at,
     )
 
 
@@ -335,6 +406,11 @@ def delete_generation(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Generation job '{generation_id}' not found.",
         )
+
+    # Cancel-first: if a worker is still processing this job, signal it to
+    # stop at the next stage boundary before the row is removed. Best-effort
+    # for terminal jobs (returns False and deletion proceeds regardless).
+    job_service.cancel_job(generation_id)
 
     # Set status to cancelled to prevent background task continuation if running
     gen.status = "cancelled"

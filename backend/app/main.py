@@ -23,8 +23,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 
 from backend.app.core.config import settings
+from backend.app.core.rate_limit import (
+    upload_limiter,
+    rate_limit_response_body,
+)
 from backend.app.db.session import init_db
 from backend.app.api.v1.router import api_router
+from backend.app.services.job_service import job_service
 
 # Configure logging
 logging.basicConfig(
@@ -42,9 +47,31 @@ async def lifespan(app: FastAPI):
     settings.ensure_storage_dirs()
     # Initialize DB schemas and default seeds
     init_db()
+    # Recover jobs orphaned by a previous process (crash / restart): any job
+    # still in an active state that predates this process start is marked
+    # failed with error_code "interrupted" so clients can retry.
+    recovered = job_service.recover_stuck_jobs()
+    if recovered:
+        logger.warning(
+            f"Recovered {recovered} orphaned job(s) left behind by a previous run."
+        )
     logger.info("PackVision AI backend startup complete.")
     yield
     logger.info("Shutting down PackVision AI backend server...")
+    # Signal in-flight workers to stop at their next stage boundary (including
+    # the checkpoint right after the generation stage, so results rendered
+    # during teardown are discarded and those jobs end up 'cancelled').
+    job_service.cancel_active_jobs()
+    # NOTE: job_service is a MODULE-LEVEL SINGLETON whose ThreadPoolExecutor
+    # is shared for the whole process. FastAPI TestClient runs this lifespan
+    # teardown after every test, and executor.shutdown() permanently poisons
+    # the singleton (later submit() raises "cannot schedule new futures after
+    # shutdown"), breaking every subsequent test that creates a job. So the
+    # executor is only shut down at real process exit — tests set
+    # PACKVISION_TESTING=1 in conftest BEFORE importing this module, and here
+    # we skip the shutdown for them. Process exit reaps the worker threads.
+    if os.getenv("PACKVISION_TESTING", "").strip().lower() not in ("1", "true", "yes"):
+        job_service.shutdown(wait=False, cancel_running=False)
 
 
 app = FastAPI(
@@ -56,14 +83,61 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS middleware.
+# CORS spec constraint: a wildcard origin ("*") is INVALID when combined with
+# allow_credentials=True — browsers reject credentialed responses from a
+# wildcard origin, and Starlette's CORSMiddleware will not echo "*" for
+# credentialed requests. So the two modes below are mutually exclusive:
+#   - CORS_ORIGINS unset/"*" -> allow_origins=["*"] with credentials disabled.
+#   - CORS_ORIGINS="https://a.com,https://b.com" -> explicit allow-list with
+#     credentials enabled.
+# Read directly from the environment (not config.py) to keep this file
+# self-contained; comma-separated list, defaults to wildcard.
+_cors_origins_raw = os.getenv("CORS_ORIGINS", "*")
+_cors_origins = [o.strip() for o in _cors_origins_raw.split(",") if o.strip()] or ["*"]
+if _cors_origins == ["*"]:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+
+# Rate limiting for the upload endpoint.
+# backend/app/api/v1/uploads.py applies per-endpoint rate limiting via FastAPI
+# dependencies for the endpoints it owns (generation create/read limits live in
+# backend/app/api/v1/generations.py). The uploads router is not owned here, so
+# POST /api/v1/uploads is limited with this lightweight HTTP middleware using
+# the shared upload_limiter (10 req/min/IP by default, env-overridable via
+# RATE_LIMIT_UPLOADS_PER_MIN). Only the remote IP is consulted, in-memory only.
+@app.middleware("http")
+async def uploads_rate_limit_middleware(request: Request, call_next):
+    path = request.url.path.rstrip("/")
+    if (
+        request.method == "POST"
+        and path == f"{settings.API_V1_PREFIX}/uploads"
+        and upload_limiter.enabled
+    ):
+        host = request.client.host if request.client else "unknown"
+        allowed, retry_after = upload_limiter.check(host)
+        if not allowed:
+            message, seconds = rate_limit_response_body(retry_after)
+            return JSONResponse(
+                status_code=429,
+                content={"detail": message},
+                headers={"Retry-After": str(seconds)},
+            )
+    return await call_next(request)
 
 # Mount API v1 router
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)

@@ -962,6 +962,25 @@ class PackVisionRenderer:
         self.procedural_renderer = ProceduralPackagingRenderer(target_size=(1024, 1024))
         self.pipeline = None
 
+        # Hybrid cloud render engine (Gemini / OpenRouter / OpenAI) - optional.
+        # RENDER_ENGINE selects the strategy: "cloud" | "local" | "auto" (cloud first,
+        # graceful fallback to local on any CloudEngineError).
+        self.render_engine_pref = (os.getenv("RENDER_ENGINE", "auto") or "auto").lower()
+        self.last_engine_used = "unknown"
+        self.cloud = None
+        try:
+            from src.cloud_engine import CloudRenderEngine
+
+            self.cloud = CloudRenderEngine(
+                provider=(
+                    os.getenv("RENDER_ENGINE_CLOUD_PROVIDER")
+                    or os.getenv("CLOUD_IMAGE_PROVIDER")
+                    or "auto"
+                )
+            )
+        except Exception as cloud_init_err:  # noqa: BLE001 - cloud engine is optional
+            print(f"[PackVisionRenderer] Cloud engine unavailable ({cloud_init_err}); local engines only.")
+
         # Custom trained PackVisionNet model
         self.custom_model_path = Path("models/checkpoints/packvision_custom_v1.pt")
         self.custom_model = None
@@ -1137,17 +1156,53 @@ class PackVisionRenderer:
         rendered_pil = Image.fromarray(cv2.cvtColor(final_bgr, cv2.COLOR_BGR2RGB))
 
         meta_chk = getattr(self, "_checkpoint_meta", {})
+        training_history = meta_chk.get("training_history") or []
+        trained_epochs = None
+        if training_history:
+            try:
+                trained_epochs = int(training_history[-1].get("epoch", len(training_history)))
+            except (TypeError, ValueError):
+                trained_epochs = len(training_history)
+        val_ssim = meta_chk.get("val_ssim")
+        val_psnr = meta_chk.get("val_psnr")
+        val_edge_iou = meta_chk.get("val_edge_iou")
+        checkpoint_metrics_present = (
+            val_ssim is not None and val_psnr is not None and val_edge_iou is not None
+        )
         metadata = {
             "engine": f"PackVisionNet-v{meta_chk.get('version', '2.0')} (Deep Neural Synthesis)",
             "checkpoint": str(self.custom_model_path),
             "parameters": sum(p.numel() for p in self.custom_model.parameters()),
-            "trained_epochs": meta_chk.get("epoch", 10),
-            "val_ssim": meta_chk.get("val_ssim", 0.95),
-            "val_psnr": meta_chk.get("val_psnr", 25.0),
-            "val_edge_iou": meta_chk.get("val_edge_iou", 0.85),
+            "trained_epochs": trained_epochs,
+            "val_ssim": val_ssim,
+            "val_psnr": val_psnr,
+            "val_edge_iou": val_edge_iou,
+            "metrics_source": (
+                "checkpoint_training_history" if checkpoint_metrics_present else "unavailable"
+            ),
             "version": meta_chk.get("version", "2.0"),
         }
         return rendered_pil, metadata
+
+    @staticmethod
+    def _letterbox_original_for_cloud(
+        sketch: Union[Image.Image, np.ndarray, str, Path], size: int = 1024
+    ) -> Image.Image:
+        """Letterbox the ORIGINAL uploaded image (photo or sketch) onto a white
+        square canvas. Used for cloud photo-mode so Kontext sees the real
+        appearance instead of the ControlNet-style processed edge map."""
+        img = sketch
+        if isinstance(img, (str, Path)):
+            img = Image.open(img)
+        elif isinstance(img, np.ndarray):
+            img = Image.fromarray(img)
+        img = img.convert("RGB")
+        scale = min(size / img.width, size / img.height)
+        nw, nh = max(1, int(img.width * scale)), max(1, int(img.height * scale))
+        resized = img.resize((nw, nh), Image.Resampling.LANCZOS)
+        canvas = Image.new("RGB", (size, size), (255, 255, 255))
+        canvas.paste(resized, ((size - nw) // 2, (size - nh) // 2))
+        return canvas
 
     def render(
         self,
@@ -1159,6 +1214,7 @@ class PackVisionRenderer:
         camera_angle: str = "three-quarter",
         background: str = "seamless studio",
         user_prompt: Optional[str] = None,
+        negative_prompt: str = "",
         brand_name: Optional[str] = None,
         color_palette: Optional[str] = None,
         conditioning_scale: float = 0.8,
@@ -1180,6 +1236,9 @@ class PackVisionRenderer:
             camera_angle: Camera perspective angle.
             background: Backdrop and pedestal environment.
             user_prompt: Additional custom creative prompt directives.
+            negative_prompt: Directives of what to avoid. Folded into the local
+                negative prompt composition and passed to cloud engines (as an
+                "Avoid: ..." directive).
             brand_name: Brand name text to integrate into branding.
             color_palette: Sophisticated color palette directive.
             conditioning_scale: ControlNet conditioning strength (0.0 to 1.5).
@@ -1197,6 +1256,8 @@ class PackVisionRenderer:
             sketch = kwargs.get("sketch_image") or kwargs.get("sketch_path") or kwargs.get("image")
         if user_prompt is None:
             user_prompt = kwargs.get("prompt") or kwargs.get("positive_prompt")
+        if not negative_prompt:
+            negative_prompt = kwargs.get("custom_negative") or ""
         if category == "carton" and "package_type" in kwargs:
             category = kwargs["package_type"]
         if substrate == "coated SBS" and "material" in kwargs:
@@ -1218,7 +1279,23 @@ class PackVisionRenderer:
         # 1. Preprocess Sketch to 1024x1024
         preprocess_res = self.preprocessor.preprocess(sketch)
 
-        # 2. Build Structured Taxonomy Prompts
+        # 1b. Resolve input mode ("auto" detects photo vs sketch). Photos sent
+        #     to cloud engines keep their real appearance instead of an edge map.
+        input_mode = (kwargs.get("input_mode") or "auto").lower()
+        if input_mode not in ("auto", "sketch", "photo"):
+            input_mode = "auto"
+        if input_mode == "auto":
+            try:
+                from src.photo_mode import detect_input_mode
+
+                input_mode = detect_input_mode(preprocess_res.image)
+            except Exception:
+                input_mode = "sketch"
+        is_photo_input = input_mode == "photo"
+
+        # 2. Build Structured Taxonomy Prompts (user negative folded into local
+        #    negative composition via custom_negative; cloud engines receive it
+        #    separately and fold it in as an "Avoid: ..." directive).
         prompt_pkg = self.prompt_engine.build_prompt(
             category=category,
             substrate=substrate,
@@ -1229,11 +1306,97 @@ class PackVisionRenderer:
             user_prompt=user_prompt,
             brand_name=brand_name,
             color_palette=color_palette,
+            custom_negative=negative_prompt or None,
         )
 
-        # 3. Execute Render (Custom Model, GPU SDXL, or Procedural Fallback)
+        # 3. Execute Render (Cloud Engine first, then Custom Model / GPU SDXL / Procedural)
         use_custom = kwargs.get("use_custom_model", False) or (kwargs.get("engine_mode") == "custom")
-        if (use_custom or (self.custom_model_path.exists() and kwargs.get("engine_mode") != "procedural" and self.is_mock)) and self._load_custom_model():
+        explicit_mode = (kwargs.get("engine_mode") or "").lower()
+        rendered_image = None
+        is_mock_flag = True
+        extra_meta: Dict[str, Any] = {}
+        engine_note = ""
+        cloud_result = None
+        cloud_fallback_reason = ""
+
+        cloud_pref = (self.render_engine_pref or "auto").lower()
+        cloud_allowed = cloud_pref in ("cloud", "auto") and explicit_mode in ("", "auto", "cloud")
+        if cloud_allowed and self.cloud is not None:
+            cloud_provider = None
+            try:
+                from src.cloud_engine import CloudEngineError
+
+                cloud_provider = self.cloud.available_provider()
+                if cloud_provider:
+                    if progress_callback:
+                        progress_callback(2, 10, f"Rendering via cloud engine ({cloud_provider})...")
+                    # Kontext-style editors need a SHORT, directive instruction.
+                    # The full prompt-engine boilerplate ("Octane Render, 8k,
+                    # PBR shaders...") dilutes the instruction and pushes the
+                    # model toward generic CGI instead of this exact sketch.
+                    cloud_prompt = prompt_pkg.positive_prompt
+                    cloud_sketch = preprocess_res.image
+                    # Kontext/Klein are instruction-based reference editors:
+                    # BOTH need the short directive prompt + sketch anchoring;
+                    # boilerplate alone lets them re-invent the geometry.
+                    if cloud_provider in ("huggingface", "cloudflare"):
+                        user_bit = f" Design concept: {user_prompt}." if user_prompt else ""
+                        if is_photo_input:
+                            cloud_prompt = (
+                                "Re-render this exact product packaging as a professional studio "
+                                "product photograph. Keep the exact same package shape, proportions, "
+                                "camera angle and ALL text, logos and label artwork unchanged. "
+                                f"Material: {prompt_pkg.substrate}. "
+                                f"Finish: {prompt_pkg.finish}. "
+                                f"Lighting: {prompt_pkg.lighting}. Background: {prompt_pkg.background}."
+                                f"{user_bit}"
+                            )
+                            cloud_sketch = self._letterbox_original_for_cloud(sketch)
+                        else:
+                            cloud_prompt = (
+                                "Turn this packaging sketch into a photorealistic studio product photograph. "
+                                "Keep the exact same box shape, silhouette, proportions, fold lines, panel "
+                                "layout, camera angle and ALL text and label artwork from the sketch. "
+                                f"Material: {prompt_pkg.substrate}. "
+                                f"Finish: {prompt_pkg.finish}. "
+                                f"Lighting: {prompt_pkg.lighting}. Background: {prompt_pkg.background}."
+                                f"{user_bit}"
+                            )
+                    try:
+                        cloud_result = self.cloud.render(
+                            sketch=cloud_sketch,
+                            prompt=cloud_prompt,
+                            negative_prompt=negative_prompt,
+                            size=1024,
+                            # ~2.5 Kontext guidance: strong sketch adherence
+                            control_strength=conditioning_scale if cloud_provider != "huggingface" else 0.35,
+                        )
+                    except CloudEngineError as cloud_err:
+                        cloud_fallback_reason = str(cloud_err)
+                        engine_note = f"cloud unavailable ({cloud_err}); fell back to local engine"
+                        print(
+                            "[PackVisionRenderer] Cloud render unavailable "
+                            f"({cloud_err}); falling back to local engine."
+                        )
+            except Exception as cloud_err:  # noqa: BLE001 - cloud must never break local rendering
+                cloud_fallback_reason = str(cloud_err)
+                engine_note = f"cloud engine error ({cloud_err}); fell back to local engine"
+                print(f"[PackVisionRenderer] Cloud engine error ({cloud_err}); using local engine.")
+
+        if cloud_result is not None:
+            rendered_image = cloud_result.image
+            is_mock_flag = False
+            engine_tag = getattr(cloud_result, "engine_tag", "") or cloud_result.provider
+            self.last_engine_used = f"cloud-{engine_tag}"
+            engine_note = engine_note or cloud_result.cost_note
+            extra_meta = {
+                "engine": f"Cloud Engine ({cloud_result.provider}:{cloud_result.model})",
+                "cloud_provider": cloud_result.provider,
+                "cloud_model": cloud_result.model,
+                "cloud_latency_s": cloud_result.latency_s,
+                "cloud_cost_note": cloud_result.cost_note,
+            }
+        elif (use_custom or (self.custom_model_path.exists() and kwargs.get("engine_mode") != "procedural" and self.is_mock)) and self._load_custom_model():
             rendered_image, is_custom_meta = self._render_with_custom_model(
                 preprocess_res=preprocess_res,
                 category=category,
@@ -1244,6 +1407,7 @@ class PackVisionRenderer:
             )
             is_mock_flag = False
             extra_meta = is_custom_meta
+            self.last_engine_used = "packvisionnet-v2"
         elif self.is_mock or self.pipeline is None:
             # Run High-Fidelity Procedural Renderer
             rendered_image = self.procedural_renderer.render(
@@ -1254,6 +1418,7 @@ class PackVisionRenderer:
             )
             is_mock_flag = True
             extra_meta = {"engine": "Procedural PBR Engine"}
+            self.last_engine_used = "procedural-pbr"
         else:
             # Run SDXL ControlNet Pipeline on GPU
             import torch
@@ -1284,8 +1449,29 @@ class PackVisionRenderer:
             rendered_image = output.images[0]
             is_mock_flag = False
             extra_meta = {"engine": "SDXL + ControlNet"}
+            self.last_engine_used = "sdxl-controlnet"
 
         elapsed = time.time() - start_time
+
+        metadata: Dict[str, Any] = {
+            **extra_meta,
+            "category": category,
+            "substrate": substrate,
+            "finish": finish,
+            "lighting": lighting,
+            "camera_angle": camera_angle,
+            "background": background,
+            "seed": seed,
+            "steps": num_inference_steps,
+            "guidance_scale": guidance_scale,
+            "conditioning_scale": conditioning_scale,
+            "engine_used": self.last_engine_used,
+            "engine_latency_s": round(elapsed, 4),
+            "engine_note": engine_note,
+            "input_mode": input_mode,
+        }
+        if cloud_fallback_reason:
+            metadata["cloud_fallback_reason"] = cloud_fallback_reason
 
         return RenderResult(
             image=rendered_image,
@@ -1296,17 +1482,5 @@ class PackVisionRenderer:
             negative_prompt=prompt_pkg.negative_prompt,
             inference_time=elapsed,
             is_mock=is_mock_flag,
-            metadata={
-                **extra_meta,
-                "category": category,
-                "substrate": substrate,
-                "finish": finish,
-                "lighting": lighting,
-                "camera_angle": camera_angle,
-                "background": background,
-                "seed": seed,
-                "steps": num_inference_steps,
-                "guidance_scale": guidance_scale,
-                "conditioning_scale": conditioning_scale,
-            },
+            metadata=metadata,
         )

@@ -270,9 +270,17 @@ def train_model(
     val_manifest = data_path / "val_manifest.jsonl"
 
     if not train_manifest.exists() or not val_manifest.exists():
-        meta_manifest = data_path / "metadata.jsonl"
-        train_manifest = meta_manifest
-        val_manifest = meta_manifest
+        # Previously this silently fell back to metadata.jsonl for BOTH splits,
+        # which trains and validates on the same samples (data leakage).
+        # Require explicit split manifests instead.
+        missing = [p.name for p in (train_manifest, val_manifest) if not p.exists()]
+        raise FileNotFoundError(
+            f"Missing split manifest(s) in {data_path}: {', '.join(missing)}. "
+            f"Refusing to train with val == train (data leakage). "
+            f"Generate them with the dataset generator "
+            f"(python data/dataset_generator.py) or repair them from disk with "
+            f"python data/repair_manifests.py --write."
+        )
 
     train_dataset = PackagingDataset(
         manifest_path=train_manifest,

@@ -25,10 +25,16 @@ RUN pip install --upgrade pip && \
 COPY src/ ./src/
 COPY ai/ ./ai/
 COPY backend/ ./backend/
-COPY configs/ ./configs/
 COPY data/ ./data/
 COPY storage/ ./storage/
 COPY ui/ ./ui/
+# frontend/ is served by backend/app/main.py from /app/frontend (the `/` workbench)
+COPY frontend/ ./frontend/
+
+# Non-root runtime user
+RUN useradd --create-home --shell /bin/bash appuser && \
+    chown -R appuser:appuser /app
+USER appuser
 
 # Expose backend API and Gradio ports
 EXPOSE 8000

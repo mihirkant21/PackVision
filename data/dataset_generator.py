@@ -11,6 +11,7 @@ Generates a comprehensive, paired synthetic packaging dataset:
 
 from __future__ import annotations
 
+import argparse
 import json
 import math
 import os
@@ -987,18 +988,54 @@ class PackagingDatasetGenerator:
         }
         return record
 
+    def _load_existing_records(self) -> List[Dict[str, Any]]:
+        """Load records already present in the output-root manifests (for appends)."""
+        meta_file = self.output_root / "metadata.jsonl"
+        records: List[Dict[str, Any]] = []
+        if not meta_file.exists():
+            return records
+        with open(meta_file, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    records.append(json.loads(line))
+        return records
+
+    def next_start_index(self) -> int:
+        """Return the next free pv_pkg_NNNN index so new ids never collide."""
+        max_idx = 0
+        for rec in self._load_existing_records():
+            sid = str(rec.get("sample_id", ""))
+            if sid.startswith("pv_pkg_"):
+                suffix = sid[len("pv_pkg_"):].split("_", 1)[0]
+                if suffix.isdigit():
+                    max_idx = max(max_idx, int(suffix))
+        return max_idx + 1 if max_idx else 1
+
     def build_dataset(
         self,
         samples_per_category: int = 30,
         val_samples_per_category: int = 5,
         base_seed: int = 2026,
+        start_index: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
-        """Generates a full paired dataset of at least 210 diverse high-quality paired triplets."""
+        """Generates a full paired dataset of at least 210 diverse high-quality paired triplets.
+
+        ``start_index`` continues the pv_pkg_NNNN numbering (auto-detected from the
+        existing metadata.jsonl when omitted) so a later run APPENDS new triplets
+        instead of overwriting earlier ids. Existing manifest records are always
+        preserved: manifests are merged (old records first, new appended), never
+        truncated.
+        """
         total_samples = samples_per_category * len(self.categories)
         total_val = val_samples_per_category * len(self.categories)
         total_train = total_samples - total_val
 
+        if start_index is None:
+            start_index = self.next_start_index()
+
         print(f"Generating PackVision AI custom paired dataset ({total_samples} samples across 7 categories)...")
+        print(f"  sample ids: pv_pkg_{start_index:04d} .. pv_pkg_{start_index + total_samples - 1:04d}")
         records = []
         start_time = time.time()
 
@@ -1006,9 +1043,10 @@ class PackagingDatasetGenerator:
         for cat_i, category in enumerate(self.categories):
             for i in range(samples_per_category):
                 sample_idx += 1
-                sample_id = f"pv_pkg_{sample_idx:04d}"
+                global_idx = start_index + sample_idx - 1
+                sample_id = f"pv_pkg_{global_idx:04d}"
                 split = "val" if i >= (samples_per_category - val_samples_per_category) else "train"
-                seed = base_seed + sample_idx * 37
+                seed = base_seed + global_idx * 37
 
                 # Balanced material and finish rotation
                 material = self.materials[(cat_i + i) % len(self.materials)]
@@ -1032,28 +1070,90 @@ class PackagingDatasetGenerator:
                     elapsed = time.time() - start_time
                     print(f"  Generated {sample_idx}/{total_samples} samples ({elapsed:.1f}s)")
 
-        # Write overall metadata.jsonl and split manifests
+        # Write overall metadata.jsonl and split manifests.
+        # Merge with any existing records so appends never clobber prior data.
         meta_file = self.output_root / "metadata.jsonl"
         train_file = self.output_root / "train_manifest.jsonl"
         val_file = self.output_root / "val_manifest.jsonl"
 
+        existing = self._load_existing_records()
+        existing_ids = {r.get("sample_id") for r in existing}
+        merged = list(existing)
+        skipped = 0
+        for r in records:
+            if r["sample_id"] in existing_ids:
+                print(f"  [warn] sample_id {r['sample_id']} already exists; keeping the old record")
+                skipped += 1
+                continue
+            existing_ids.add(r["sample_id"])
+            merged.append(r)
+
         with open(meta_file, "w", encoding="utf-8") as f_all, \
              open(train_file, "w", encoding="utf-8") as f_train, \
              open(val_file, "w", encoding="utf-8") as f_val:
-            for r in records:
+            for r in merged:
                 line = json.dumps(r) + "\n"
                 f_all.write(line)
-                if r["split"] == "train":
+                if r.get("split") == "train":
                     f_train.write(line)
                 else:
                     f_val.write(line)
 
         print(f"Dataset generation complete!")
-        print(f"  Total: {len(records)} samples ({total_train} train, {total_val} val)")
+        print(f"  Generated: {len(records) - skipped} new samples ({total_train} train, {total_val} val)")
+        print(f"  Manifest records: {len(existing)} -> {len(merged)} (merged)")
         print(f"  Manifest: {meta_file}")
         return records
 
 
+def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
+    default_categories = ["carton", "box", "pouch", "bottle", "jar", "can", "tube"]
+    parser = argparse.ArgumentParser(
+        description="Generate the paired PackVision AI packaging dataset "
+                    "(sketch / render / depth triplets + manifests)."
+    )
+    parser.add_argument(
+        "--samples", type=int, default=30,
+        help="Samples generated per category (default: 30).",
+    )
+    parser.add_argument(
+        "--val-samples", type=int, default=5,
+        help="Of the per-category samples, how many go to the val split (default: 5).",
+    )
+    parser.add_argument(
+        "--categories", type=str, default=",".join(default_categories),
+        help="Comma-separated category list (default: carton,box,pouch,bottle,jar,can,tube).",
+    )
+    parser.add_argument(
+        "--seed", type=int, default=42,
+        help="Base seed for deterministic generation (default: 42).",
+    )
+    parser.add_argument(
+        "--start-index", type=int, default=None,
+        help="First pv_pkg_NNNN index for this run (default: auto-detect the next "
+             "free index from the existing metadata.jsonl so runs append safely).",
+    )
+    parser.add_argument(
+        "--output-root", type=str, default="data/dataset",
+        help="Output directory for triplets and manifests (default: data/dataset).",
+    )
+    return parser.parse_args(argv)
+
+
 if __name__ == "__main__":
-    generator = PackagingDatasetGenerator(output_root="data/dataset")
-    generator.build_dataset(samples_per_category=30, val_samples_per_category=5, base_seed=42)
+    cli_args = _parse_args()
+    generator = PackagingDatasetGenerator(output_root=cli_args.output_root)
+    categories = [c.strip() for c in cli_args.categories.split(",") if c.strip()]
+    unknown = [c for c in categories if c not in generator.categories]
+    if unknown:
+        raise SystemExit(
+            f"Unknown categories: {unknown}. "
+            f"Supported geometry categories: {generator.categories}"
+        )
+    generator.categories = categories
+    generator.build_dataset(
+        samples_per_category=cli_args.samples,
+        val_samples_per_category=cli_args.val_samples,
+        base_seed=cli_args.seed,
+        start_index=cli_args.start_index,
+    )
