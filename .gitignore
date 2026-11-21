@@ -97,11 +97,13 @@ out/
 .idea/
 .vscode/
 .zcode/
+~$*
 *.swp
 *.swo
 .DS_Store
 Thumbs.db
 desktop.ini
+submissions/*.zip
 
 # Environment Variables & Secrets (NEVER push API keys)
 .env
