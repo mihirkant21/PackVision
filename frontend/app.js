@@ -1605,16 +1605,18 @@
     }
 
     // Slider interaction
-    elements.sliderContainer.addEventListener("mousedown", () => {
+    elements.sliderContainer.addEventListener("mousedown", (e) => {
       state.sliderActive = true;
+      onSliderMove(e);
     });
     window.addEventListener("mouseup", () => {
       state.sliderActive = false;
     });
     window.addEventListener("mousemove", onSliderMove);
 
-    elements.sliderContainer.addEventListener("touchstart", () => {
+    elements.sliderContainer.addEventListener("touchstart", (e) => {
       state.sliderActive = true;
+      onSliderMove(e);
     });
     window.addEventListener("touchend", () => {
       state.sliderActive = false;

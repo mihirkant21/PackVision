@@ -115,11 +115,15 @@
 select.field {
   appearance: none;
   -webkit-appearance: none;
-  padding-right: 30px;
+  padding-right: 32px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
   cursor: pointer;
 }
 .select-wrap {
   position: relative;
+  min-width: 0;
 }
 .select-caret {
   position: absolute;
@@ -130,6 +134,25 @@ select.field {
   transform: translateY(-50%);
   color: var(--text-muted);
   pointer-events: none;
+}
+
+/* ---- Drawing Drop Zone & Canvas Geometry (Strict 1:1 Aspect Ratio) ---- */
+#drop-zone {
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  max-width: 360px;
+  margin-left: auto;
+  margin-right: auto;
+}
+#sketch-canvas {
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---- Comparison Slider responsive height ---- */
+#slider-container {
+  max-height: calc(100vh - 200px);
 }
 
 /* ---- Quiet text buttons (Metadata, Rate & review, Cancel, sample logo) ---- */
