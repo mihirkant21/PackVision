@@ -155,6 +155,18 @@ select.field {
   max-height: calc(100vh - 200px);
 }
 
+/* ---- Preview stage empty state & container vertical alignment ---- */
+#render-empty-state {
+  margin-top: 1rem;
+  margin-bottom: auto;
+}
+#slider-container,
+#side-by-side-container,
+#render-progress-card {
+  margin-top: auto;
+  margin-bottom: auto;
+}
+
 /* ---- Quiet text buttons (Metadata, Rate & review, Cancel, sample logo) ---- */
 .quiet-btn {
   background: none;
