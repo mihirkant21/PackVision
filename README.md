@@ -67,31 +67,55 @@ PackVision AI is a visual prototyping system that bridges the gap between early 
 
 ```text
 PackVision-AI/
-├── ai/ / src/                       # Core AI/ML Engine
-│   ├── preprocessor.py              # Sketch normalization & edge extraction
-│   ├── prompt_engine.py             # Packaging taxonomy & prompt synthesis
-│   ├── pipeline.py                  # SDXL + ControlNet + Procedural renderer
+├── src/                             # Core AI/ML Engine & Pipelines
+│   ├── pipeline.py                  # SDXL + Multi-ControlNet + 3D Facet PBR Renderer
+│   ├── preprocessor.py              # Sketch normalization, Canny edges & depth maps
+│   ├── prompt_engine.py             # Packaging taxonomy & PBR prompt synthesis
 │   ├── postprocessor.py             # Stage-2 Homography & CIELAB Logo compositor
-│   └── evaluation.py                # Edge SSIM, CLIP Score, FID, LPIPS metrics
-├── backend/app/                     # FastAPI Backend Server
-│   ├── main.py                      # Server entry point & CORS
-│   ├── core/config.py               # Pydantic Settings & environment variables
-│   ├── db/                          # SQLAlchemy database session & models
+│   ├── cloud_engine.py              # Multi-provider cloud image inference (Gemini/HF/OpenRouter/OpenAI)
+│   ├── config_classifier.py         # Packaging configuration classifier
+│   ├── photo_mode.py                # Studio photoreal rendering modes
+│   ├── taxonomy.py                  # Canonical packaging materials, finishes & categories
+│   ├── vlm_client.py                # Vision-Language Model client for evaluations
+│   ├── evaluation.py                # Edge SSIM, IoU, and CLIP semantic alignment metrics
+│   └── models/                      # Custom PackVisionNet neural architecture
+├── backend/app/                     # FastAPI Backend Application
+│   ├── main.py                      # Server entry point, CORS, lifespan & static mounts
+│   ├── core/                        # Configuration & sliding-window rate limiters
+│   ├── db/                          # SQLAlchemy database session & relational models
 │   ├── schemas/                     # Pydantic request/response schemas
-│   ├── services/                    # AssetService, JobService, InferenceService
-│   └── api/v1/                      # Endpoints (/uploads, /generations, /files, etc.)
-├── frontend/                        # Web Studio Workbench (HTML5/Tailwind/JS)
-├── ui/                              # Standalone Gradio ML Studio
-│   └── app_gradio.py
-├── data/                            # Datasets & Samples
-│   ├── samples/                     # Sample packaging sketches & logos
-│   ├── dataset_generator.py         # Synthetic paired dataset generator (CLI: --samples/--categories/--seed)
-│   └── repair_manifests.py          # Dataset manifest repair tool (dry-run default, --write)
-├── docs/                            # Architecture & API documentation
-├── storage/                         # Local asset storage (inputs, outputs, thumbs)
+│   ├── services/                    # AssetService, JobService & InferenceService
+│   └── api/v1/                      # Endpoints (/health, /taxonomy, /uploads, /generations, /files)
+├── frontend/                        # Luxury Packaging Studio Web UI (HTML5, Tailwind, JS)
+├── ui/                              # Standalone Gradio ML Research Workbench
+│   └── app_gradio.py                # Interactive parameters, sliders, before/after comparisons
+├── models/checkpoints/              # Trained weights & checkpoints (packvision_custom_v1.pt)
+├── data/                            # Datasets, Manifests & Samples
+│   ├── samples/                     # Sample packaging sketches & vector logos
+│   ├── dataset/                     # Paired training & validation manifests
+│   ├── dataset_generator.py         # Synthetic paired dataset generator
+│   ├── build_dataset.py             # Dataset builder & HuggingFace metadata generator
+│   └── repair_manifests.py          # Dataset manifest reconciliation tool
+├── scripts/                         # Utilities, training & verification scripts
+│   ├── test_render_engine.py        # Standalone procedural render engine test
+│   ├── test_facet_seg.py            # 3D facet segmentation diagnostic
+│   ├── train_custom_model.py        # PackVisionNet deep neural trainer
+│   ├── train_config_classifier.py   # Packaging configuration classifier trainer
+│   ├── train_lora_sdxl.py           # SDXL LoRA fine-tuning script
+│   ├── integration_check.py         # Live end-to-end backend integration verifier
+│   ├── generate_project_docx.py     # Technical documentation docx generator
+│   └── package_submissions.py       # Automated submission package builder
+├── tests/                           # Core ML, pipeline, taxonomy & cloud engine tests
+├── backend/tests/                   # Backend API, rate limiter & job lifecycle tests
+├── docs/                            # Specifications, architecture, API reference & research notes
+├── storage/                         # Local asset storage (inputs, outputs, thumbnails)
 ├── Dockerfile.backend               # Container definition
 ├── docker-compose.yml               # Multi-container orchestration
-└── requirements.txt                 # Python dependencies
+├── requirements.txt                 # Python dependencies
+├── run_tests.bat                    # 1-click test suite launcher (pytest)
+├── start_studio.bat                 # 1-click Web Studio launcher
+├── start_gradio.bat                 # 1-click Gradio Workbench launcher
+└── train_custom_model.bat           # 1-click neural model training launcher
 ```
 
 ---
