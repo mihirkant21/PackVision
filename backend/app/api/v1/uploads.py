@@ -35,6 +35,9 @@ async def upload_asset(
     user_id: Optional[str] = Form(
         None, description="Optional user identifier associated with asset"
     ),
+    project_id: Optional[str] = Form(
+        None, description="Optional project identifier associated with asset"
+    ),
     db: Session = Depends(get_db),
 ) -> UploadResponse:
     norm_type = asset_type.strip().lower()
@@ -49,6 +52,7 @@ async def upload_asset(
         upload_file=file,
         asset_type=norm_type,
         user_id=user_id,
+        project_id=project_id,
     )
 
     return UploadResponse(

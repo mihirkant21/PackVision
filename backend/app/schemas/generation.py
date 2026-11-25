@@ -5,6 +5,9 @@ from backend.app.schemas.asset import AssetResponse
 
 
 class GenerationCreate(BaseModel):
+    project_id: Optional[str] = Field(
+        default=None, description="Optional UUID of project"
+    )
     input_asset_id: str = Field(description="UUID of sketch or base asset")
     reference_asset_id: Optional[str] = Field(
         default=None, description="UUID of reference/moodboard asset"
@@ -94,6 +97,7 @@ class GenerationResponse(BaseModel):
 
     id: str
     user_id: Optional[str] = None
+    project_id: Optional[str] = None
     input_asset_id: str
     reference_asset_id: Optional[str] = None
     logo_asset_id: Optional[str] = None

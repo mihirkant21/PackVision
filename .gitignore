@@ -64,9 +64,15 @@ storage/outputs/*
 !storage/outputs/.gitkeep
 storage/thumbnails/*
 !storage/thumbnails/.gitkeep
+storage/composites/*
+!storage/composites/.gitkeep
+storage/preprocessed/*
+!storage/preprocessed/.gitkeep
 storage/cloud_provider_state.json
 storage/research/
 storage/*.log
+backend/storage/
+backend/storage/*
 
 # Databases
 packvision.db
@@ -89,6 +95,8 @@ test_render_*.png
 
 # Node & Web
 node_modules/
+frontend/node_modules/
+frontend/dist/
 .next/
 out/
 .npm

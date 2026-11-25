@@ -3,6 +3,8 @@ from typing import List, Union
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -20,18 +22,21 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     API_V1_PREFIX: str = "/api/v1"
 
-    # Database & Storage
-    DATABASE_URL: str = "sqlite:///./packvision.db"
-    STORAGE_PATH: str = "./storage"
+    # Database & Storage (anchored to project root)
+    DATABASE_URL: str = f"sqlite:///{(_PROJECT_ROOT / 'packvision.db').as_posix()}"
+    STORAGE_PATH: str = str(_PROJECT_ROOT / "storage")
     MAX_UPLOAD_MB: int = 25
 
     # Inference Configuration
     USE_MOCK_INFERENCE: bool = True
     MODEL_DEVICE: str = "auto"
+    SD15_BASE_MODEL: str = "runwayml/stable-diffusion-v1-5"
+    CONTROLNET_CANNY_MODEL: str = "lllyasviel/control_v11p_sd15_canny"
     SDXL_BASE_MODEL: str = "stabilityai/stable-diffusion-xl-base-1.0"
     CONTROLNET_MODEL: str = "diffusers/controlnet-canny-sdxl-1.0"
     VAE_MODEL: str = "madebyollin/sdxl-vae-fp16-fix"
     LORA_WEIGHTS_PATH: str = ""
+    COLAB_INFERENCE_URL: str = ""
 
     # Hybrid Render Engine (cloud-first rendering with local fallback)
     RENDER_ENGINE: str = "auto"  # "cloud" | "local" | "auto" (cloud first, local fallback)

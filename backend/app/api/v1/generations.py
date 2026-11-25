@@ -50,6 +50,7 @@ def serialize_generation(gen: Generation) -> GenerationResponse:
     return GenerationResponse(
         id=gen.id,
         user_id=gen.user_id,
+        project_id=gen.project_id,
         input_asset_id=gen.input_asset_id,
         reference_asset_id=gen.reference_asset_id,
         logo_asset_id=gen.logo_asset_id,
@@ -161,6 +162,7 @@ def create_generation(
     generation = Generation(
         id=str(uuid.uuid4()),
         user_id=effective_user_id,
+        project_id=payload.project_id,
         input_asset_id=payload.input_asset_id,
         reference_asset_id=payload.reference_asset_id,
         logo_asset_id=payload.logo_asset_id,
@@ -196,14 +198,17 @@ def list_generations(
     limit: int = Query(20, ge=1, le=100, description="Items per page"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
     status_filter: Optional[str] = Query(None, alias="status", description="Filter by status"),
+    project_id: Optional[str] = Query(None, description="Filter by project ID"),
     db: Session = Depends(get_db),
     # Rate limit: 120 read requests per minute per IP (env-overridable via
     # RATE_LIMIT_READ_PER_MIN). 429 + Retry-After when exhausted.
     _rate_limit: None = Depends(rate_limit_read),
 ) -> GenerationListResponse:
     query = db.query(Generation)
-    if status_filter:
-        query = query.filter(Generation.status == status_filter)
+    if status_filter and status_filter.strip().lower() not in ("", "all", "undefined", "null"):
+        query = query.filter(Generation.status == status_filter.strip())
+    if project_id and project_id.strip().lower() not in ("", "all", "undefined", "null"):
+        query = query.filter(Generation.project_id == project_id.strip())
 
     total = query.count()
     generations = (
@@ -390,6 +395,32 @@ def submit_feedback(
         comment=feedback.comment,
         created_at=feedback.created_at,
     )
+
+
+@router.delete(
+    "/generations",
+    summary="Clear all generation history records",
+    description="Deletes all generation records and associated output mappings from the database.",
+)
+def clear_all_generations(
+    db: Session = Depends(get_db),
+):
+    try:
+        # Delete output associations and then generations
+        db.query(GenerationOutput).delete()
+        count = db.query(Generation).delete()
+        db.commit()
+        return {
+            "success": True,
+            "message": f"Successfully cleared {count} generation records.",
+            "deleted_count": count,
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to clear history: {str(e)}",
+        )
 
 
 @router.delete(

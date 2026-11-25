@@ -43,9 +43,44 @@ class User(Base):
         "Generation", back_populates="user"
     )
     feedbacks: Mapped[List["Feedback"]] = relationship("Feedback", back_populates="user")
+    projects: Mapped[List["Project"]] = relationship("Project", back_populates="user")
 
     def __repr__(self) -> str:
         return f"<User {self.email}>"
+
+
+class Project(Base):
+    __tablename__ = "projects"
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    user_id: Mapped[Optional[str]] = mapped_column(
+        String(36), ForeignKey("users.id"), nullable=True, index=True
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    package_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    material: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    finish: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    negative_prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    thumbnail_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+
+    # Relationships
+    user: Mapped[Optional["User"]] = relationship("User", back_populates="projects")
+    generations: Mapped[List["Generation"]] = relationship(
+        "Generation", back_populates="project"
+    )
+
+    def __repr__(self) -> str:
+        return f"<Project {self.name} ({self.id})>"
 
 
 class Asset(Base):
@@ -56,6 +91,9 @@ class Asset(Base):
     )
     user_id: Mapped[Optional[str]] = mapped_column(
         String(36), ForeignKey("users.id"), nullable=True, index=True
+    )
+    project_id: Mapped[Optional[str]] = mapped_column(
+        String(36), ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True
     )
     storage_key: Mapped[str] = mapped_column(String(500), nullable=False)
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -90,6 +128,9 @@ class Generation(Base):
     )
     user_id: Mapped[Optional[str]] = mapped_column(
         String(36), ForeignKey("users.id"), nullable=True, index=True
+    )
+    project_id: Mapped[Optional[str]] = mapped_column(
+        String(36), ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True
     )
     input_asset_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("assets.id"), nullable=False, index=True
@@ -139,6 +180,7 @@ class Generation(Base):
 
     # Relationships
     user: Mapped[Optional["User"]] = relationship("User", back_populates="generations")
+    project: Mapped[Optional["Project"]] = relationship("Project", back_populates="generations")
     input_asset: Mapped["Asset"] = relationship(
         "Asset", foreign_keys=[input_asset_id], backref="input_for_generations"
     )

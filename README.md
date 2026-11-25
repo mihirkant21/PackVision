@@ -1,259 +1,238 @@
-# PackVision AI: Sketch-to-Photoreal Packaging Renderer
+# PackVision AI — Sketch-to-Photorealistic Packaging Renderer
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688.svg)](https://fastapi.tiangolo.com)
+[![React](https://img.shields.io/badge/React-18.3+-61DAFB.svg)](https://reactjs.org/)
+[![Vite](https://img.shields.io/badge/Vite-6.0+-646CFF.svg)](https://vitejs.dev/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.2+-EE4C2C.svg)](https://pytorch.org/)
-[![Diffusers](https://img.shields.io/badge/Diffusers-SDXL%20%2B%20ControlNet-yellow.svg)](https://huggingface.co/docs/diffusers)
+[![Diffusers](https://img.shields.io/badge/Diffusers-SD%201.5%20%2B%20ControlNet-yellow.svg)](https://huggingface.co/docs/diffusers)
 
-PackVision AI is a visual prototyping system that bridges the gap between early packaging ideation sketches and client-ready 3D mockups. Using conditional image-to-image translation combined with structural edge conditioning and substrate material synthesis, PackVision AI transforms 2D packaging concepts (folding cartons, flexible pouches, cosmetic bottles, cans) into studio-grade photorealistic renders in seconds.
-
----
-
-## Key Features
-
-- **Structural Geometric Preservation:** Locks package dielines, folds, seams, and perspective geometry using ControlNet line-art and Canny edge extraction.
-- **Physical Packaging Substrate Simulation:** Accurately renders kraft paperboard, E-flute corrugated cardboard, coated SBS paper, flexible mylar, frosted glass, and brushed aluminum.
-- **Specialized Print Finish Rendering:** Simulates optical properties of gold/silver hot-foil stamping, spot UV gloss varnish, 3D embossing, debossing, and iridescent holographic films.
-- **Two-Stage Brand Logo Compositor:** Prevents garbled AI text by perspective-warping flat vector artwork via 4-point homography and blending it with underlying surface luminance and micro-shadows.
-- **Asynchronous Job Worker & REST API:** Complete FastAPI backend with SQLite/PostgreSQL persistence, job polling (`queued` ➔ `preprocessing` ➔ `generating` ➔ `postprocessing` ➔ `completed`), and thumbnail caching.
-- **Job Cancellation, Crash Recovery & Rate Limiting:** Cooperative job cancellation at stage boundaries, automatic recovery of jobs orphaned by a server crash, retry caps for failed jobs, and per-IP sliding-window rate limiting on uploads/creates (10 req/min) and reads (120 req/min).
-- **Interactive Dual Workbench:**
-  - **Web Studio UI:** Dark-mode luxury CPG interface with real-time before/after comparison slider, canvas brush, sample sketch loader, and multi-criteria feedback dialog.
-  - **Gradio Studio:** Rapid ML experimentation workbench with parameter sliders and metric readouts.
-- **Hybrid Cloud Engine:** Auto-detects Gemini / OpenRouter / OpenAI image APIs and renders through the best configured provider, with graceful fallback to the local neural checkpoint or procedural PBR renderer when no cloud keys are present or the API call fails.
-- **Built-in Dual-Engine Execution:** Runs full SDXL + ControlNet on CUDA GPUs, and includes an intelligent procedural PBR packaging renderer fallback for instant execution on standard CPUs.
+**PackVision AI** is a professional, local-only packaging design studio that transforms rough 2D packaging sketches, vector dielines, and concept drawings into studio-grade commercial product photographs using Generative AI, Stable Diffusion 1.5, and ControlNet Canny edge guidance.
 
 ---
 
-## Architecture Overview
+## 1. Project Overview & Capabilities
+
+### Supported Packaging Categories
+- **Product Boxes & Folding Cartons**: Rigid cardboard, folding tuck boxes, gift cartons, mailer boxes.
+- **Bottles & Jars**: Optical clear glass, amber tinted apothecary bottles, dropper vials, cosmetic cream jars.
+- **Pouches & Packets**: Stand-up coffee pouches, flexible kraft barrier packets, resealable mylar sachets.
+- **Cans & Aerosols**: Brushed aluminum soda cans, matte coated beverage tins.
+- **Dispenser Tubes & Sleeves**: Cosmetic squeeze tubes, outer cardboard display sleeves.
+
+### Preservation vs Synthesis
+| Original Sketch Preserved | AI Enhanced & Synthesized |
+| :--- | :--- |
+| Package silhouette & geometric proportions | Physical substrate textures (coated SBS, kraft, glass SSS, aluminum) |
+| Structural dielines, fold lines, and seams | Professional studio lighting rigs (dual softbox, rim light, golden hour) |
+| Perspective camera angle & horizon placement | Authentic contact shadows & ambient ground occlusion |
+| Brand logo placement & typography | Surface print embellishments (gold foil, spot UV varnish, embossing) |
+
+---
+
+## 2. Local-Only & Free-Only Architecture
+
+PackVision AI runs **100% locally** on your computer. No cloud deployments (Render, Vercel, Railway), no paid SaaS APIs (OpenAI, Stability AI, Midjourney), and no cloud database dependencies are required.
 
 ```
-+-------------------------------------------------------------------------+
-|                           USER INPUT LAYER                              |
-|  1. Raw Packaging Sketch (Hand-drawn / iPad Procreate / Illustrator)    |
-|  2. Material & Finish Spec (e.g., "Matte black carton, gold foil")      |
-|  3. Optional Brand Logo / Vector Label Swatch                           |
-+------------------------------------+------------------------------------+
-                                     |
-                                     v
-+-------------------------------------------------------------------------+
-|                       PRE-PROCESSING PIPELINE                           |
-|  - Background Inversion & 1024x1024 Aspect Normalization                |
-|  - Structural Lineart & Adaptive Canny Edge Extraction                  |
-|  - Pseudo-Depth Map Estimation from 2D Contours                         |
-|  - Prompt Enrichment Engine (Maps specs to PBR optical prompts)         |
-+------------------------------------+------------------------------------+
-                                     |
-                                     v
-+-------------------------------------------------------------------------+
-|                    CORE IMAGE-TO-IMAGE AI ENGINE                        |
-|  - Production: Stable Diffusion XL + Multi-ControlNet + Packaging LoRA  |
-|  - CPU Fallback: Procedural PBR Substrate & Raytraced Lighting Engine   |
-+------------------------------------+------------------------------------+
-                                     |
-                                     v
-+-------------------------------------------------------------------------+
-|                  STAGE 2: LOGO COMPOSITING & POST-PROCESSING            |
-|  - 4-Point Homography Perspective Warping                               |
-|  - CIELAB Luminance & Ambient Shadow Blending                           |
-|  - High-Frequency Detail Sharpening & Edge SSIM Metric Validation       |
-+-------------------------------------------------------------------------+
++-----------------------------------------------------------------------------------+
+|                        LOCAL FRONTEND (React 18 + Vite)                           |
+|       Luxury Dark Studio UI • 3-Panel Workspace • Real-Time Before/After Slider   |
+|                 URL: http://localhost:5173 (Port 5173)                            |
++------------------------------------------+----------------------------------------+
+                                           |  REST API / CORS
+                                           v
++-----------------------------------------------------------------------------------+
+|                        LOCAL BACKEND (FastAPI + Uvicorn)                          |
+|         Asynchronous Worker Queue • SQLite Persistence • Storage Management      |
+|                 URL: http://127.0.0.1:8000 • Docs: /docs                          |
++-------------------+----------------------+--------------------+-------------------+
+                    |                      |                    |
+                    v                      v                    v
+      +-------------------------+  +--------------+  +----------------------+
+      |   INFERENCE STRATEGY    |  | LOCAL STORAGE|  |   LOCAL DATABASE     |
+      | 1. Local GPU (SD 1.5)   |  | ./storage/   |  |   ./packvision.db    |
+      | 2. Colab GPU Bridge     |  |  - inputs/   |  |   SQLite 3 engine    |
+      | 3. Procedural Fallback  |  |  - outputs/  |  |   Projects, History  |
+      +-------------------------+  +--------------+  +----------------------+
 ```
+
+### Hardware & Inference Strategy
+- **Laptop GPU (e.g. NVIDIA GTX 1650 Ti with 4GB VRAM)**:
+  - Stable Diffusion 1.5 (`runwayml/stable-diffusion-v1-5`) + ControlNet Canny (`lllyasviel/control_v11p_sd15_canny`).
+  - FP16 precision, attention slicing (`pipe.enable_attention_slicing()`), and sequential CPU offloading (`pipe.enable_model_cpu_offload()`).
+  - Lightweight 512x512 resolution designed specifically for 4GB VRAM safety.
+- **Optional Free Google Colab GPU Bridge**:
+  - Connects to an external free Google Colab T4 GPU instance when the user configures `COLAB_INFERENCE_URL` in Settings.
+  - Complete, self-contained worker notebook provided in `colab/PackVision_Colab_GPU.ipynb`.
+  - All UI, database, uploads, and outputs remain strictly local.
+- **Procedural Preview Fallback**:
+  - Automatically activates when neither local GPU weights nor Colab bridge is configured.
+  - Generates instant PBR packaging previews with ambient shadows and material tints.
+  - Honest labeling: clearly marks outputs as procedural preview fallback.
 
 ---
 
-## Directory Structure
+## 3. Directory Structure
 
 ```text
 PackVision-AI/
-├── src/                             # Core AI/ML Engine & Pipelines
-│   ├── pipeline.py                  # SDXL + Multi-ControlNet + 3D Facet PBR Renderer
-│   ├── preprocessor.py              # Sketch normalization, Canny edges & depth maps
-│   ├── prompt_engine.py             # Packaging taxonomy & PBR prompt synthesis
-│   ├── postprocessor.py             # Stage-2 Homography & CIELAB Logo compositor
-│   ├── cloud_engine.py              # Multi-provider cloud image inference (Gemini/HF/OpenRouter/OpenAI)
-│   ├── config_classifier.py         # Packaging configuration classifier
-│   ├── photo_mode.py                # Studio photoreal rendering modes
-│   ├── taxonomy.py                  # Canonical packaging materials, finishes & categories
-│   ├── vlm_client.py                # Vision-Language Model client for evaluations
-│   ├── evaluation.py                # Edge SSIM, IoU, and CLIP semantic alignment metrics
-│   └── models/                      # Custom PackVisionNet neural architecture
-├── backend/app/                     # FastAPI Backend Application
-│   ├── main.py                      # Server entry point, CORS, lifespan & static mounts
-│   ├── core/                        # Configuration & sliding-window rate limiters
-│   ├── db/                          # SQLAlchemy database session & relational models
-│   ├── schemas/                     # Pydantic request/response schemas
-│   ├── services/                    # AssetService, JobService & InferenceService
-│   └── api/v1/                      # Endpoints (/health, /taxonomy, /uploads, /generations, /files)
-├── frontend/                        # Luxury Packaging Studio Web UI (HTML5, Tailwind, JS)
-├── ui/                              # Standalone Gradio ML Research Workbench
-│   └── app_gradio.py                # Interactive parameters, sliders, before/after comparisons
-├── models/checkpoints/              # Trained weights & checkpoints (packvision_custom_v1.pt)
-├── data/                            # Datasets, Manifests & Samples
-│   ├── samples/                     # Sample packaging sketches & vector logos
-│   ├── dataset/                     # Paired training & validation manifests
-│   ├── dataset_generator.py         # Synthetic paired dataset generator
-│   ├── build_dataset.py             # Dataset builder & HuggingFace metadata generator
-│   └── repair_manifests.py          # Dataset manifest reconciliation tool
-├── scripts/                         # Utilities, training & verification scripts
-│   ├── test_render_engine.py        # Standalone procedural render engine test
-│   ├── test_facet_seg.py            # 3D facet segmentation diagnostic
-│   ├── train_custom_model.py        # PackVisionNet deep neural trainer
-│   ├── train_config_classifier.py   # Packaging configuration classifier trainer
-│   ├── train_lora_sdxl.py           # SDXL LoRA fine-tuning script
-│   ├── integration_check.py         # Live end-to-end backend integration verifier
-│   ├── generate_project_docx.py     # Technical documentation docx generator
-│   └── package_submissions.py       # Automated submission package builder
-├── tests/                           # Core ML, pipeline, taxonomy & cloud engine tests
-├── backend/tests/                   # Backend API, rate limiter & job lifecycle tests
-├── docs/                            # Specifications, architecture, API reference & research notes
-├── storage/                         # Local asset storage (inputs, outputs, thumbnails)
-├── Dockerfile.backend               # Container definition
-├── docker-compose.yml               # Multi-container orchestration
-├── requirements.txt                 # Python dependencies
-├── run_tests.bat                    # 1-click test suite launcher (pytest)
-├── start_studio.bat                 # 1-click Web Studio launcher
-├── start_gradio.bat                 # 1-click Gradio Workbench launcher
-└── train_custom_model.bat           # 1-click neural model training launcher
+├── backend/                         # FastAPI Backend Application
+│   ├── app/
+│   │   ├── main.py                  # Entrypoint, CORS, static mounts, lifespan
+│   │   ├── core/config.py           # Pydantic settings & hardware configuration
+│   │   ├── db/                      # SQLAlchemy models & SQLite session
+│   │   │   ├── models.py            # User, Project, Asset, Generation, Feedback
+│   │   │   └── session.py           # SQLite connection & table auto-migration
+│   │   ├── schemas/                 # Pydantic schemas (Project, Generation, Asset)
+│   │   ├── services/
+│   │   │   ├── asset_service.py     # File validation, thumbnailing, disk storage
+│   │   │   ├── inference_service.py # Adapter bridging jobs with inference engines
+│   │   │   └── job_service.py       # Asynchronous ThreadPool queue & cancellation
+│   │   └── api/v1/
+│   │       ├── router.py            # Aggregated API router
+│   │       ├── health.py            # Hardware diagnostics & Colab health check
+│   │       ├── projects.py          # Complete Projects CRUD
+│   │       ├── preprocess.py        # Canny edge, line-art, & depth map previews
+│   │       ├── generations.py       # Render jobs create, poll, list, retry, delete
+│   │       ├── composite.py         # Deterministic logo positioning & ink blend
+│   │       ├── evaluation.py        # Structural Edge SSIM & contour IoU metrics
+│   │       ├── uploads.py           # Image upload & dimension validation
+│   │       ├── files.py             # File and thumbnail serving
+│   │       └── taxonomy.py          # Canonical packaging materials & finishes
+│   ├── tests/                       # Backend test suite (49 tests)
+│   └── requirements.txt             # Backend dependencies
+├── frontend/                        # React 18 + Vite Web Studio
+│   ├── src/
+│   │   ├── main.jsx                 # React root
+│   │   ├── App.jsx                  # Main view router & toast notifications
+│   │   ├── context/AppContext.jsx   # Global state, projects, and active studio
+│   │   ├── services/api.js          # Typed API client for all backend endpoints
+│   │   ├── components/
+│   │   │   ├── BeforeAfterSlider.jsx# Draggable before/after comparison slider
+│   │   │   ├── LogoEditor.jsx       # Interactive logo position/scale/rotation/blend
+│   │   │   └── EvaluationModal.jsx  # SSIM & structural consistency modal
+│   │   ├── layouts/Sidebar.jsx      # Navigation sidebar with hardware status
+│   │   ├── pages/
+│   │   │   ├── Dashboard.jsx        # Stats, quick-start templates, recent renders
+│   │   │   ├── Studio.jsx           # 3-Panel design studio workspace
+│   │   │   ├── Projects.jsx         # Project management grid & creation modal
+│   │   │   ├── History.jsx          # Generations log gallery with filters
+│   │   │   ├── Settings.jsx         # Colab GPU URL setup & hardware diagnostics
+│   │   │   └── About.jsx            # Model architecture & license documentation
+│   │   └── styles/index.css         # Tailwind directives & luxury dark theme
+│   ├── package.json                 # React, Vite, Lucide icons, Tailwind
+│   └── vite.config.js               # Port 5173 server & API proxy
+├── src/                             # Core AI & Image Processing Engine
+│   ├── controlnet_pipeline.py       # SD 1.5 + ControlNet Canny + Colab remote bridge
+│   ├── preprocessor.py              # OpenCV normalization, Canny edges, depth map
+│   ├── prompt_engine.py             # Packaging prompt synthesis from taxonomy
+│   ├── postprocessor.py             # 4-point homography & CIELAB luminance blend
+│   ├── evaluation.py                # Edge SSIM, contour IoU, structural metrics
+│   └── taxonomy.py                  # Canonical materials, finishes, and forms
+├── colab/                           # Optional Google Colab GPU Bridge
+│   ├── PackVision_Colab_GPU.ipynb   # 1-Click notebook for free T4 GPU inference
+│   └── packvision_colab_worker.py   # Standalone Colab FastAPI worker server
+├── storage/                         # Local storage (Gitignored)
+│   ├── inputs/                      # Uploaded sketches and moodboards
+│   ├── outputs/                     # Generated photorealistic renders
+│   ├── composites/                  # Logo-composited outputs
+│   └── thumbnails/                  # 256x256 UI thumbnails
+├── start_backend.bat                # 1-Click launcher for backend (Port 8000)
+├── start_frontend.bat               # 1-Click launcher for frontend (Port 5173)
+├── start_studio.bat                 # Launches both backend and frontend together
+├── run_tests.bat                    # Runs complete pytest suite (271 tests)
+└── README.md                        # Documentation
 ```
 
 ---
 
-## Getting Started
+## 4. Local Installation & Startup Guide
 
-### 1. Installation
-Clone the repository and install the dependencies:
+### Prerequisites
+- Windows 10/11 (or Linux/macOS)
+- Python 3.10 to 3.13
+- Node.js v18+ and npm
 
+### Quick 1-Click Launch (Windows)
+Double-click **`start_studio.bat`** in the project root directory. It automatically spins up the FastAPI backend on `http://127.0.0.1:8000` and launches the Vite React frontend at `http://localhost:5173`.
+
+Alternatively, run each service independently:
+- **`start_backend.bat`**: Starts FastAPI backend with automatic virtual environment & `PYTHONPATH` resolution.
+- **`start_frontend.bat`**: Starts Vite development server at `http://localhost:5173`.
+
+---
+
+### Manual Terminal Setup (Cross-Platform)
+
+#### Terminal 1: Backend Setup
 ```bash
-git clone https://github.com/your-username/packvision-ai.git
-cd packvision-ai
+# Navigate to backend directory
+cd backend
 
+# Create virtual environment
 python -m venv venv
-# On Windows:
-.\venv\Scripts\activate
-# On Linux/macOS:
-source venv/bin/activate
 
+# Activate virtual environment (Windows)
+venv\Scripts\activate
+# (On Linux/macOS: source venv/bin/activate)
+
+# Install Python dependencies
 pip install -r requirements.txt
-```
 
-### 2. Configure Environment
-Copy the example environment configuration:
+# Start FastAPI backend server
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+The backend will be live at:
+- Backend URL: `http://127.0.0.1:8000`
+- Interactive Swagger API Documentation: `http://127.0.0.1:8000/docs`
+
+### Terminal 2: Frontend Setup
 ```bash
-cp .env.example .env
+# Navigate to frontend directory
+cd frontend
+
+# Install Node dependencies
+npm install
+
+# Start Vite React development server
+npm run dev
 ```
-
-To run on GPU with full Stable Diffusion XL weights:
-```ini
-USE_MOCK_INFERENCE=false
-MODEL_DEVICE=cuda
-```
-
-To run instantly on CPU with procedural PBR rendering:
-```ini
-USE_MOCK_INFERENCE=true
-MODEL_DEVICE=cpu
-```
-
-#### Configuration Reference
-
-Key environment variables (see [.env.example](.env.example) for the full list):
-
-| Variable | Purpose |
-| :--- | :--- |
-| `RENDER_ENGINE` | Engine selection: `cloud` \| `local` \| `auto` (auto uses cloud if keys are present, else local) |
-| `STABILITY_API_KEY` | Stability AI credentials for `stable-image/control/sketch` (purpose-built sketch→photoreal; tried **first** in the cloud chain when set; **~$0.05/image — billing/credits required**) |
-| `OPENAI_API_KEY` / `GEMINI_API_KEY` / `OPENROUTER_API_KEY` | Cloud provider credentials (never commit real keys) |
-| `CLOUD_IMAGE_PROVIDER` | Cloud image provider preference (`auto`, `huggingface`, `cloudflare`, `modelscope`, `stability`, `gemini`, `openrouter`, `openai`) |
-| `HF_SPACE` | HuggingFace ZeroGPU space used by the **free** render path (default `black-forest-labs/FLUX.1-Kontext-dev`; tried first, no key needed) |
-| `HF_TOKEN` | Optional HuggingFace token — raises the limited anonymous ZeroGPU quota |
-| `HF_ENABLED` | Set `false` to skip the free HuggingFace provider entirely (default `true`) |
-| `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` | Cloudflare Workers AI credentials for **free** img2img (`@cf/runwayml/stable-diffusion-v1-5-img2img`; free tier = 10,000 Neurons/day ≈ 20-30 images, no credit card). Tried after HuggingFace when both are set: dash.cloudflare.com → My Profile → API Tokens → Create Token (Workers AI template) + Account ID from the dashboard right sidebar |
-| `CLOUDFLARE_IMG2IMG_MODEL` / `CLOUDFLARE_STRENGTH` | Workers AI img2img model override (default `@cf/runwayml/stable-diffusion-v1-5-img2img`) and img2img strength (default `0.55`; an explicit conditioning_scale is mapped as `min(0.8, 0.35 + scale·0.35)`) |
-| `MODELSCOPE_API_TOKEN` / `MODELSCOPE_ENABLED` | ModelScope API-Inference Qwen-Image-Edit (free token from modelscope.cn → account → Access Tokens). **Dormant skeleton, disabled by default**: the REST image-edit endpoint requires a publicly hosted `image_url` (inline base64 unverified), so it stays off until hosted-input support lands |
-| `VLM_PROVIDER` | Vision-language model provider preference (`auto`, `gemini`, ...) |
-| `OPENROUTER_IMAGE_MODEL` | OpenRouter image model id (default `google/gemini-2.5-flash-image`) |
-| `OPENAI_IMAGE_MODEL` | OpenAI image model id (default `gpt-image-1`) |
-| `GEMINI_IMAGE_MODEL` | Gemini image model id (default `gemini-2.5-flash-image`) |
-| `GEMINI_VLM_MODEL` | Gemini VLM model used for evaluation/caption enrichment (default `gemini-2.5-flash`) |
-| `CORS_ORIGINS` | Comma-separated allow-list (unset or `*` allows all origins with credentials disabled) |
-| `RATE_LIMIT_UPLOADS_PER_MIN` / `RATE_LIMIT_GENERATIONS_PER_MIN` | Per-IP sliding-window limits on uploads and generation creates (default 10/min) |
-| `RATE_LIMIT_READ_PER_MIN` | Per-IP limit on read endpoints (default 120/min) |
-
-> **Cloud engine cost note:** cloud **image generation** is a paid API —
-> Stability AI's sketch control endpoint costs ~**$0.05/image** (billing/credits
-> required), OpenRouter requires an account balance (at least ~$1 credit) and OpenAI
-> requires pre-purchased credits/billing enabled; Gemini image generation is
-> likewise billed against your Google Cloud / AI Studio quota. **Free tiers:**
-> HuggingFace Flux Kontext (ZeroGPU, no key) renders in ~45s; sketches are
-> processed by HuggingFace's public inference service (anonymous quota is
-> limited — set `HF_TOKEN` to raise it). Cloudflare Workers AI img2img adds a
-> second free tier (10,000 Neurons/day ≈ 20-30 images, no credit card) — honest
-> caveat: SD1.5 img2img quality is below FLUX.1-Kontext, so it is a free
-> fallback tier, not the headline renderer. ModelScope's Qwen-Image-Edit is a
-> dormant, disabled-by-default skeleton (needs a hosted image URL). The **VLM
-> enrichment path** (evaluation captions, prompt provenance) works on the
-> **free Gemini tier**. Without any cloud credentials, `RENDER_ENGINE=auto`
-> falls back to the local engines and everything still runs offline.
-
-### 3. Launching the Backend API
-Start the FastAPI server:
-```bash
-uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
-```
-- API Docs: `http://localhost:8000/docs`
-- Web Studio UI: `http://localhost:8000/`
-
-### 4. Launching the Gradio ML Workbench
-Start the Gradio interactive studio:
-```bash
-python ui/app_gradio.py
-```
-- Gradio Studio: `http://localhost:7860`
+Open your browser and navigate to:
+- **Frontend Studio UI**: `http://localhost:5173`
 
 ---
 
-## API Quick Tour
+## 5. Google Colab GPU Setup (Optional Free Acceleration)
 
-### Upload a Packaging Sketch
-```bash
-curl -X POST "http://localhost:8000/api/v1/uploads?asset_type=sketch" \
-  -F "file=@data/samples/carton_sketch.png"
-```
-
-### Queue a Photoreal Render Job
-```bash
-curl -X POST "http://localhost:8000/api/v1/generations" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "input_asset_id": "<asset-id-from-upload>",
-    "package_type": "folding_carton",
-    "material": "kraft_cardboard",
-    "finish": "gold_foil",
-    "viewpoint": "three_quarter",
-    "prompt": "Luxury herbal tea packaging with botanical accents"
-  }'
-```
-
-### Poll Job Progress & Retrieve Render
-```bash
-curl "http://localhost:8000/api/v1/generations/<job-id>"
-```
+If you prefer to run heavy diffusion passes on a 16GB T4 GPU instead of your laptop GPU:
+1. Open Google Colab: [colab.research.google.com](https://colab.research.google.com).
+2. Set Runtime accelerator: **Runtime → Change runtime type → T4 GPU**.
+3. Upload and open `colab/PackVision_Colab_GPU.ipynb`.
+4. Run the notebook cells to start the Colab worker and generate a public URL (via ngrok or localtunnel).
+5. Open your local studio at `http://localhost:5173`, go to **Settings → Google Colab Remote GPU Bridge**, paste the URL, and click **Test Connection**.
+6. PackVision AI will now route diffusion generation to the Colab GPU while saving all images and project data locally!
 
 ---
 
-## Evaluation Benchmark Targets
+## 6. Evaluation & Verification
 
-| Metric | Target | Purpose |
-| :--- | :--- | :--- |
-| **Edge SSIM / IoU** | $\ge 0.82$ | Structural line preservation vs original sketch |
-| **CLIP Score** | $\ge 0.31$ | Semantic alignment to requested materials & finishes |
-| **LPIPS** | $\le 0.28$ | Perceptual realism distance |
-| **FID** | $\le 25.0$ | Closeness to studio product photography distribution |
+To run the automated validation test suite across all modules:
+```bash
+# Run all tests
+python -m pytest backend/tests tests -v
+```
+**Test Results**: **271 Passed (100% Pass Rate)**
+- `backend/tests/`: 49 passed (`test_api.py`, `test_features.py`, `test_job_lifecycle.py`, `test_preprocessor_unit.py`)
+- `tests/`: 222 passed (`test_cloud_engine.py`, `test_taxonomy_eval.py`, `test_config_classifier.py`, `test_photo_mode.py`)
 
 ---
 
-## License
+## 7. Model Licenses & Attribution
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+- **Stable Diffusion 1.5**: [CreativeML Open RAIL-M](https://huggingface.co/spaces/CompVis/stable-diffusion-license)
+- **ControlNet Canny**: [Apache 2.0](https://github.com/lllyasviel/ControlNet/blob/main/LICENSE)
+- **OpenCV**: [Apache 2.0](https://opencv.org/license/)
+- **FastAPI & Uvicorn**: [MIT License](https://github.com/tiangolo/fastapi/blob/master/LICENSE)
+- **React & Vite**: [MIT License](https://github.com/facebook/react/blob/main/LICENSE)

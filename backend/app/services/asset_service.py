@@ -48,20 +48,11 @@ class AssetService:
                 detail="Unsupported or corrupted image file format (invalid magic bytes).",
             )
 
-        # Allow image/jpg as alias for image/jpeg
-        norm_declared = "image/jpeg" if declared_mime == "image/jpg" else declared_mime
-        if norm_declared not in settings.ALLOWED_IMAGE_TYPES:
+        # Ensure the verified detected format is among permitted types
+        if detected_mime not in settings.ALLOWED_IMAGE_TYPES:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"MIME type '{declared_mime}' is not permitted. Allowed: {settings.ALLOWED_IMAGE_TYPES}",
-            )
-
-        if detected_mime != norm_declared and not (
-            detected_mime == "image/jpeg" and norm_declared == "image/jpeg"
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Declared MIME '{declared_mime}' does not match detected format '{detected_mime}'.",
+                detail=f"Detected format '{detected_mime}' is not permitted. Allowed: {settings.ALLOWED_IMAGE_TYPES}",
             )
 
         return detected_mime
@@ -129,6 +120,7 @@ class AssetService:
         upload_file: UploadFile,
         asset_type: str = "sketch",
         user_id: Optional[str] = None,
+        project_id: Optional[str] = None,
     ) -> Asset:
         """Process an uploaded file from FastAPI endpoint, validate, create thumbnail, and persist."""
         content = await upload_file.read()
@@ -163,6 +155,7 @@ class AssetService:
         asset = Asset(
             id=asset_id,
             user_id=effective_user_id,
+            project_id=project_id,
             storage_key=storage_key,
             file_name=upload_file.filename or file_name,
             asset_type=asset_type,

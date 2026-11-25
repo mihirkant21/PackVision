@@ -1,6 +1,6 @@
 import logging
 from typing import Generator
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 
 from backend.app.core.config import settings
@@ -39,6 +39,27 @@ def init_db() -> None:
     """Initialize database tables and seed default user if not exists."""
     logger.info("Initializing database tables...")
     Base.metadata.create_all(bind=engine)
+
+    # Safe column migration for SQLite if existing database lacks project_id
+    with engine.connect() as conn:
+        try:
+            # Check generations table
+            result_gen = conn.execute(text("PRAGMA table_info(generations)")).fetchall()
+            gen_cols = [r[1] for r in result_gen]
+            if "project_id" not in gen_cols:
+                logger.info("Migrating database: adding project_id column to generations table...")
+                conn.execute(text("ALTER TABLE generations ADD COLUMN project_id VARCHAR(36)"))
+                conn.commit()
+
+            # Check assets table
+            result_assets = conn.execute(text("PRAGMA table_info(assets)")).fetchall()
+            asset_cols = [r[1] for r in result_assets]
+            if "project_id" not in asset_cols:
+                logger.info("Migrating database: adding project_id column to assets table...")
+                conn.execute(text("ALTER TABLE assets ADD COLUMN project_id VARCHAR(36)"))
+                conn.commit()
+        except Exception as e:
+            logger.debug(f"Migration check notice: {e}")
 
     with SessionLocal() as db:
         user = db.query(User).filter(User.id == DEFAULT_SYSTEM_USER_ID).first()

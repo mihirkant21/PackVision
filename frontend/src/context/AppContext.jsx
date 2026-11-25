@@ -1,0 +1,116 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { api } from '../services/api';
+
+const AppContext = createContext();
+
+export const AppProvider = ({ children }) => {
+  const [activeView, setActiveView] = useState('dashboard');
+  const [healthData, setHealthData] = useState(null);
+  const [taxonomy, setTaxonomy] = useState(null);
+  const [activeProject, setActiveProject] = useState(null);
+  const [studioInitialState, setStudioInitialState] = useState(null);
+  const [evaluationModalData, setEvaluationModalData] = useState(null);
+  const [notification, setNotification] = useState(null);
+
+  // Load health & taxonomy on app startup
+  useEffect(() => {
+    refreshHealth();
+    loadTaxonomy();
+  }, []);
+
+  const refreshHealth = async () => {
+    try {
+      const data = await api.getHealth();
+      setHealthData(data);
+    } catch (err) {
+      console.error('Failed to load service health:', err);
+    }
+  };
+
+  const loadTaxonomy = async () => {
+    try {
+      const data = await api.getTaxonomy();
+      setTaxonomy(data);
+    } catch (err) {
+      console.error('Failed to load taxonomy:', err);
+    }
+  };
+
+  const showNotification = (message, type = 'info') => {
+    setNotification({ message, type, id: Date.now() });
+    setTimeout(() => {
+      setNotification((current) => (current && current.message === message ? null : current));
+    }, 4000);
+  };
+
+  const openProjectInStudio = (project) => {
+    setActiveProject(project);
+    setStudioInitialState({
+      projectId: project.id,
+      packageType: project.package_type || 'bottle',
+      material: project.material || 'glass',
+      finish: project.finish || 'glossy',
+      prompt: project.prompt || '',
+      negativePrompt: project.negative_prompt || '',
+    });
+    setActiveView('studio');
+  };
+
+  const loadGenerationInStudio = (gen) => {
+    setStudioInitialState({
+      projectId: gen.project_id || null,
+      packageType: gen.package_type || 'bottle',
+      material: gen.material || 'glass',
+      finish: gen.finish || 'glossy',
+      viewpoint: gen.viewpoint || 'front',
+      background: gen.background || 'studio_clean',
+      prompt: gen.prompt || '',
+      negativePrompt: gen.negative_prompt || '',
+      seed: gen.seed,
+      inputAsset: gen.input_asset,
+      logoAsset: gen.logo_asset,
+      completedOutput: gen.outputs && gen.outputs[0] ? gen.outputs[0].asset : null,
+      completedGen: gen,
+    });
+    setActiveView('studio');
+  };
+
+  const openEvaluationModal = (sketchAssetId, renderAssetId, prompt = '') => {
+    setEvaluationModalData({
+      sketchAssetId,
+      renderAssetId,
+      prompt,
+    });
+  };
+
+  const closeEvaluationModal = () => {
+    setEvaluationModalData(null);
+  };
+
+  return (
+    <AppContext.Provider
+      value={{
+        activeView,
+        setActiveView,
+        healthData,
+        refreshHealth,
+        taxonomy,
+        activeProject,
+        setActiveProject,
+        studioInitialState,
+        setStudioInitialState,
+        openProjectInStudio,
+        loadGenerationInStudio,
+        evaluationModalData,
+        openEvaluationModal,
+        closeEvaluationModal,
+        notification,
+        showNotification,
+      }}
+    >
+      {children}
+    </AppContext.Provider>
+  );
+};
+
+export const useApp = () => useContext(AppContext);

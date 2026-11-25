@@ -7,6 +7,13 @@ from backend.app.schemas.generation import (
     GenerationListResponse,
 )
 from backend.app.schemas.feedback import FeedbackCreate, FeedbackResponse
+from backend.app.schemas.project import (
+    ProjectCreate,
+    ProjectUpdate,
+    ProjectResponse,
+    ProjectListResponse,
+    ProjectDetailResponse,
+)
 from backend.app.schemas.taxonomy import (
     TaxonomyItem,
     MaterialItem,

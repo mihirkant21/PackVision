@@ -3,9 +3,16 @@ import sys
 import subprocess
 from pathlib import Path
 
+# Ensure project root and backend dir are at the top of sys.path
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+_BACKEND_DIR = _PROJECT_ROOT / "backend"
+for _p in [str(_BACKEND_DIR), str(_PROJECT_ROOT)]:
+    if _p in sys.path:
+        sys.path.remove(_p)
+    sys.path.insert(0, _p)
+
 # Self-relauncher: if executed with global python lacking dependencies,
 # automatically delegate to the local project virtual environment (.venv).
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 _VENV_PYTHON = _PROJECT_ROOT / ".venv" / "Scripts" / "python.exe"
 if _VENV_PYTHON.exists() and Path(sys.executable).resolve() != _VENV_PYTHON.resolve():
     try:
@@ -144,6 +151,9 @@ app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
 # Static files for modern packaging studio workbench
 FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "frontend"
+FRONTEND_DIST = FRONTEND_DIR / "dist"
+if FRONTEND_DIST.exists():
+    app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets")), name="assets")
 if FRONTEND_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
 
@@ -151,7 +161,8 @@ if FRONTEND_DIR.exists():
 @app.get("/", summary="Web Workbench UI or API metadata")
 def root(request: Request):
     accept_header = request.headers.get("accept", "")
-    index_file = FRONTEND_DIR / "index.html"
+    dist_index = FRONTEND_DIST / "index.html"
+    index_file = dist_index if dist_index.exists() else (FRONTEND_DIR / "index.html")
     if "text/html" in accept_header and index_file.exists():
         return FileResponse(str(index_file))
     

@@ -1,21 +1,24 @@
 @echo off
-title PackVision AI - Luxury Packaging Design Studio
+title PackVision AI - Local Application Launcher
 color 0A
 echo =======================================================================
-echo          PackVision AI - Neural Packaging Synthesis Studio
+echo         PackVision AI - Sketch-to-Photoreal Packaging Studio
 echo =======================================================================
 echo.
 cd /d "%~dp0"
 
-set PYTHON_CMD=python
-if exist ".venv\Scripts\python.exe" (
-    set PYTHON_CMD=.venv\Scripts\python.exe
-)
+echo [1/2] Launching Backend Server on http://127.0.0.1:8000...
+start "PackVision Backend" cmd /k "%~dp0start_backend.bat"
 
-echo [*] Starting PackVision AI Backend & Web Workbench...
-echo [*] Environment Python: %PYTHON_CMD%
+timeout /t 3 /nobreak >nul
+
+echo [2/2] Launching React Frontend on http://localhost:5173...
+start "PackVision Frontend" cmd /k "%~dp0start_frontend.bat"
+
 echo.
-
-start "" "http://localhost:8000"
-%PYTHON_CMD% -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
-pause
+echo =======================================================================
+echo   PackVision AI Studio is now running!
+echo   Frontend:  http://localhost:5173
+echo   Backend:   http://127.0.0.1:8000
+echo   API Docs:  http://127.0.0.1:8000/docs
+echo =======================================================================

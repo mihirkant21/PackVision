@@ -1184,6 +1184,83 @@ class PackVisionRenderer:
         }
         return rendered_pil, metadata
 
+    def _check_and_render_colab_or_local(
+        self,
+        preprocess_res: PreprocessResult,
+        prompt_pkg: PromptPackage,
+        seed: Optional[int] = None,
+        steps: int = 30,
+        guidance_scale: float = 7.5,
+        conditioning_scale: float = 0.85,
+        progress_callback: Optional[Callable[[int, int, str], None]] = None,
+    ) -> Optional[Image.Image]:
+        """Checks Colab GPU bridge or local SD 1.5 + ControlNet before procedural fallback."""
+        try:
+            from src.controlnet_pipeline import colab_bridge, local_controlnet
+
+            # 1. Check if Colab GPU URL is set and reachable
+            if colab_bridge.is_configured():
+                health = colab_bridge.check_health()
+                if health.get("online"):
+                    if progress_callback:
+                        progress_callback(3, 10, "Inference executing via Google Colab GPU (SD 1.5 + ControlNet)...")
+                    rendered = colab_bridge.generate(
+                        edge_image=preprocess_res.canny,
+                        prompt=prompt_pkg.positive_prompt,
+                        negative_prompt=prompt_pkg.negative_prompt,
+                        steps=steps,
+                        guidance_scale=guidance_scale,
+                        controlnet_scale=conditioning_scale,
+                        seed=seed,
+                        width=512,
+                        height=512,
+                    )
+                    self._last_neural_result = (
+                        rendered,
+                        False,
+                        {
+                            "engine": "Google Colab GPU (SD 1.5 + ControlNet Canny)",
+                            "colab_gpu": health.get("gpu", "T4 GPU"),
+                            "resolution": "512x512",
+                        },
+                        "colab-gpu-sd15-controlnet",
+                    )
+                    return rendered
+
+            # 2. Check if local CUDA GPU model is enabled and available
+            if not self.is_mock and local_controlnet.is_available():
+                if progress_callback:
+                    progress_callback(3, 10, "Inference executing via Local GPU (SD 1.5 + ControlNet Canny)...")
+                rendered = local_controlnet.generate(
+                    edge_image=preprocess_res.canny,
+                    prompt=prompt_pkg.positive_prompt,
+                    negative_prompt=prompt_pkg.negative_prompt,
+                    steps=steps,
+                    guidance_scale=guidance_scale,
+                    controlnet_scale=conditioning_scale,
+                    seed=seed,
+                    width=512,
+                    height=512,
+                    progress_callback=progress_callback,
+                )
+                self._last_neural_result = (
+                    rendered,
+                    False,
+                    {
+                        "engine": f"Local GPU (SD 1.5 + ControlNet Canny)",
+                        "device": local_controlnet.hardware.device_name,
+                        "resolution": "512x512",
+                    },
+                    "local-gpu-sd15-controlnet",
+                )
+                return rendered
+
+        except Exception as e:
+            logger.warning(f"Colab/Local neural pipeline check notice: {e}")
+
+        self._last_neural_result = None
+        return None
+
     @staticmethod
     def _letterbox_original_for_cloud(
         sketch: Union[Image.Image, np.ndarray, str, Path], size: int = 1024
@@ -1408,8 +1485,19 @@ class PackVisionRenderer:
             is_mock_flag = False
             extra_meta = is_custom_meta
             self.last_engine_used = "packvisionnet-v2"
+        elif self._check_and_render_colab_or_local(
+            preprocess_res=preprocess_res,
+            prompt_pkg=prompt_pkg,
+            seed=seed,
+            steps=num_inference_steps,
+            guidance_scale=guidance_scale,
+            conditioning_scale=conditioning_scale,
+            progress_callback=progress_callback,
+        ) is not None:
+            rendered_image, is_mock_flag, extra_meta, engine_tag = self._last_neural_result
+            self.last_engine_used = engine_tag
         elif self.is_mock or self.pipeline is None:
-            # Run High-Fidelity Procedural Renderer
+            # Run High-Fidelity Procedural Packaging Preview Fallback
             rendered_image = self.procedural_renderer.render(
                 preprocess_res=preprocess_res,
                 prompt_pkg=prompt_pkg,
@@ -1417,7 +1505,10 @@ class PackVisionRenderer:
                 progress_callback=progress_callback,
             )
             is_mock_flag = True
-            extra_meta = {"engine": "Procedural PBR Engine"}
+            extra_meta = {
+                "engine": "Procedural Preview Fallback (No GPU/Weights Loaded)",
+                "note": "Procedural preview generated. For neural diffusion, configure Google Colab GPU URL in Settings or enable local GPU weights.",
+            }
             self.last_engine_used = "procedural-pbr"
         else:
             # Run SDXL ControlNet Pipeline on GPU
