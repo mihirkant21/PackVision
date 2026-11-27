@@ -113,7 +113,7 @@ export default function Studio() {
     }).catch((e) => console.error(e));
   }, []);
 
-  // Hydrate from studioInitialState if passed from Dashboard / Projects
+  // Hydrate from studioInitialState if passed from Dashboard / Projects / History
   useEffect(() => {
     if (studioInitialState) {
       if (studioInitialState.packageType) setPackageType(studioInitialState.packageType);
@@ -125,14 +125,22 @@ export default function Studio() {
       if (studioInitialState.negativePrompt) setNegativePrompt(studioInitialState.negativePrompt);
       if (studioInitialState.projectId) setSelectedProjectId(studioInitialState.projectId);
 
-      if (studioInitialState.inputAsset) {
-        setSketchAssetId(studioInitialState.inputAsset.id);
-        setSketchPreviewUrl(studioInitialState.inputAsset.url);
+      const inId = studioInitialState.inputAssetId || studioInitialState.inputAsset?.id;
+      const inUrl = studioInitialState.inputAssetUrl || studioInitialState.inputAsset?.url || (inId ? `/api/v1/files/${inId}` : null);
+      if (inUrl) {
+        setSketchAssetId(inId);
+        setSketchPreviewUrl(inUrl);
       }
-      if (studioInitialState.completedOutput) {
-        setActiveRenderResult(studioInitialState.completedOutput.url);
-        setActiveRenderAssetId(studioInitialState.completedOutput.id);
+
+      const outId = studioInitialState.completedOutputId || studioInitialState.completedOutput?.id;
+      const outUrl = studioInitialState.completedOutputUrl || studioInitialState.completedOutput?.url || (outId ? `/api/v1/files/${outId}` : null);
+      if (outUrl) {
+        setActiveRenderResult(outUrl);
+        setActiveRenderAssetId(outId);
+        setRawRenderResult(outUrl);
+        setRawRenderAssetId(outId);
       }
+
       if (studioInitialState.completedGen) {
         setGenerationMeta(studioInitialState.completedGen);
       }
@@ -142,20 +150,25 @@ export default function Studio() {
 
   // Sync activeRenderResult whenever generationMeta is present
   useEffect(() => {
-    if (generationMeta && !activeRenderResult) {
+    if (generationMeta) {
       const firstOut = generationMeta.outputs && generationMeta.outputs[0];
       const outputAsset = firstOut?.asset || (generationMeta.assets?.find((a) => a.asset_type === 'output'));
       const outputAssetId = firstOut?.asset_id || outputAsset?.id || generationMeta.output_asset_id;
       const outputUrl = outputAsset?.url || (outputAssetId ? `/api/v1/files/${outputAssetId}` : null);
-      if (outputUrl) {
+
+      if (outputUrl && !activeRenderResult) {
         setActiveRenderResult(outputUrl);
         setActiveRenderAssetId(outputAssetId);
         setRawRenderResult(outputUrl);
         setRawRenderAssetId(outputAssetId);
       }
-      if (generationMeta.input_asset && !sketchPreviewUrl) {
-        setSketchAssetId(generationMeta.input_asset.id);
-        setSketchPreviewUrl(generationMeta.input_asset.url);
+
+      const inAsset = generationMeta.input_asset || (generationMeta.assets?.find((a) => a.asset_type === 'sketch'));
+      const inAssetId = generationMeta.input_asset_id || inAsset?.id;
+      const inUrl = inAsset?.url || (inAssetId ? `/api/v1/files/${inAssetId}` : null);
+      if (inUrl && !sketchPreviewUrl) {
+        setSketchAssetId(inAssetId);
+        setSketchPreviewUrl(inUrl);
       }
     }
   }, [generationMeta, activeRenderResult, sketchPreviewUrl]);
@@ -170,13 +183,18 @@ export default function Studio() {
           if (isMounted && res.items && res.items.length > 0) {
             const latest = res.items[0];
             setGenerationMeta(latest);
-            if (latest.input_asset) {
-              setSketchAssetId(latest.input_asset.id);
-              setSketchPreviewUrl(latest.input_asset.url);
+
+            const inAsset = latest.input_asset || (latest.assets?.find((a) => a.asset_type === 'sketch'));
+            const inAssetId = latest.input_asset_id || inAsset?.id;
+            const inUrl = inAsset?.url || (inAssetId ? `/api/v1/files/${inAssetId}` : null);
+            if (inUrl) {
+              setSketchAssetId(inAssetId);
+              setSketchPreviewUrl(inUrl);
             }
+
             const firstOut = latest.outputs && latest.outputs[0];
-            const outputAsset = firstOut?.asset;
-            const outputAssetId = firstOut?.asset_id || outputAsset?.id;
+            const outputAsset = firstOut?.asset || (latest.assets?.find((a) => a.asset_type === 'output'));
+            const outputAssetId = firstOut?.asset_id || outputAsset?.id || latest.output_asset_id;
             const outputUrl = outputAsset?.url || (outputAssetId ? `/api/v1/files/${outputAssetId}` : null);
             if (outputUrl) {
               setActiveRenderResult(outputUrl);
@@ -184,6 +202,7 @@ export default function Studio() {
               setRawRenderResult(outputUrl);
               setRawRenderAssetId(outputAssetId);
             }
+
             if (latest.package_type) setPackageType(latest.package_type);
             if (latest.material) setMaterial(latest.material);
             if (latest.finish) setFinish(latest.finish);

@@ -57,6 +57,15 @@ export const AppProvider = ({ children }) => {
   };
 
   const loadGenerationInStudio = (gen) => {
+    const firstOutput = gen.outputs && gen.outputs[0];
+    const outputAsset = firstOutput?.asset || (gen.assets?.find((a) => a.asset_type === 'output')) || null;
+    const outputAssetId = firstOutput?.asset_id || outputAsset?.id || gen.output_asset_id || null;
+    const outputUrl = outputAsset?.url || (outputAssetId ? `/api/v1/files/${outputAssetId}` : null);
+
+    const inputAsset = gen.input_asset || (gen.assets?.find((a) => a.asset_type === 'sketch')) || null;
+    const inputAssetId = gen.input_asset_id || inputAsset?.id || null;
+    const inputUrl = inputAsset?.url || (inputAssetId ? `/api/v1/files/${inputAssetId}` : null);
+
     setStudioInitialState({
       projectId: gen.project_id || null,
       packageType: gen.package_type || 'bottle',
@@ -67,9 +76,13 @@ export const AppProvider = ({ children }) => {
       prompt: gen.prompt || '',
       negativePrompt: gen.negative_prompt || '',
       seed: gen.seed,
-      inputAsset: gen.input_asset,
+      inputAssetId: inputAssetId,
+      inputAssetUrl: inputUrl,
+      inputAsset: inputAsset,
       logoAsset: gen.logo_asset,
-      completedOutput: gen.outputs && gen.outputs[0] ? gen.outputs[0].asset : null,
+      completedOutputId: outputAssetId,
+      completedOutputUrl: outputUrl,
+      completedOutput: outputAsset,
       completedGen: gen,
     });
     setActiveView('studio');
