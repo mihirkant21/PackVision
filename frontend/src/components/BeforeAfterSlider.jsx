@@ -1,14 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Eye, Split, Sparkles, Layers } from 'lucide-react';
+import { Eye, Split, Sparkles, Layers, Upload } from 'lucide-react';
 
 export default function BeforeAfterSlider({
   beforeImage,
   afterImage,
   beforeLabel = 'Original Sketch / Edge Map',
   afterLabel = 'AI Photoreal Render',
+  onUploadClick,
+  onFileDrop,
 }) {
   const [sliderPos, setSliderPos] = useState(50);
   const [isDragging, setIsDragging] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const containerRef = useRef(null);
 
   const handleMove = (clientX) => {
@@ -48,9 +51,44 @@ export default function BeforeAfterSlider({
 
   if (!beforeImage && !afterImage) {
     return (
-      <div className="w-full h-full min-h-[420px] flex flex-col items-center justify-center text-[#94A3B8] bg-[#12151D] rounded-xl border border-[#242A38] p-8">
-        <Layers className="w-12 h-12 text-[#8B5CF6] opacity-50 mb-3" />
-        <p className="font-medium text-sm">Upload a sketch and generate a render to view comparison</p>
+      <div
+        onClick={onUploadClick}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setIsDragOver(true);
+        }}
+        onDragLeave={() => setIsDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setIsDragOver(false);
+          const file = e.dataTransfer.files?.[0];
+          if (file && onFileDrop) onFileDrop(file);
+        }}
+        className={`w-full h-full min-h-[460px] max-h-[75vh] flex flex-col items-center justify-center text-center rounded-2xl border-2 border-dashed p-8 transition-all cursor-pointer select-none group ${
+          isDragOver
+            ? 'border-[#8B5CF6] bg-[#8B5CF6]/10 scale-[1.01]'
+            : 'border-[#242A38] hover:border-[#8B5CF6]/60 bg-[#12151D] hover:bg-[#171B25]'
+        }`}
+        title="Click or drag & drop a sketch image to get started"
+      >
+        <div className="w-16 h-16 rounded-2xl bg-[#8B5CF6]/15 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform border border-[#8B5CF6]/30 shadow-lg shadow-[#8B5CF6]/10">
+          <Upload className="w-8 h-8 text-[#A78BFA]" />
+        </div>
+        <h3 className="font-bold text-base text-white mb-1.5">Upload Packaging Sketch</h3>
+        <p className="text-xs text-[#94A3B8] max-w-sm mb-5 leading-relaxed">
+          Click anywhere or drag &amp; drop a sketch image (PNG, JPG, WebP) to begin generating photorealistic renders.
+        </p>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (onUploadClick) onUploadClick();
+          }}
+          className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-[#8B5CF6] hover:bg-[#7C3AED] text-white shadow-lg shadow-[#8B5CF6]/25 transition-all flex items-center gap-2"
+        >
+          <Upload className="w-4 h-4" />
+          Choose Sketch File
+        </button>
       </div>
     );
   }

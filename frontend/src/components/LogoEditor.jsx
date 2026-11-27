@@ -38,9 +38,12 @@ export default function LogoEditor({
 
   const canvasRef = useRef(null);
 
-  const handleLogoUpload = async (e) => {
-    const file = e.target.files?.[0];
+  const processLogoFile = async (file) => {
     if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showNotification('Please select a valid image file (PNG, SVG, JPG).', 'error');
+      return;
+    }
 
     try {
       showNotification('Uploading brand logo asset...', 'info');
@@ -54,6 +57,14 @@ export default function LogoEditor({
     } catch (err) {
       showNotification(`Logo upload failed: ${err.message}`, 'error');
     }
+  };
+
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      await processLogoFile(file);
+    }
+    e.target.value = '';
   };
 
   const handleApplyComposite = async () => {

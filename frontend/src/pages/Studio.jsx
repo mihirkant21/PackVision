@@ -105,6 +105,8 @@ export default function Studio() {
   const [selectedProjectId, setSelectedProjectId] = useState(activeProject?.id || '');
 
   const pollingRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const [isDragOverLeft, setIsDragOverLeft] = useState(false);
 
   // Load projects list
   useEffect(() => {
@@ -266,10 +268,13 @@ export default function Studio() {
     }
   };
 
-  // Upload handler for sketch
-  const handleSketchUpload = async (e) => {
-    const file = e.target.files?.[0];
+  // Dedicated image processor for sketch upload (shared between file picker and drag-drop)
+  const processSketchFile = async (file) => {
     if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showNotification('Please select a valid image file (PNG, JPG, JPEG, WebP).', 'error');
+      return;
+    }
 
     try {
       showNotification('Uploading sketch...', 'info');
@@ -279,12 +284,31 @@ export default function Studio() {
       const uploadRes = await api.uploadAsset(file, 'sketch');
       if (uploadRes.success && uploadRes.asset) {
         setSketchAssetId(uploadRes.asset.id);
-        showNotification('Sketch uploaded. Computing structural edges...', 'success');
+        showNotification('Sketch uploaded. Computing structural edge maps...', 'success');
         await triggerPreprocessing(uploadRes.asset.id, null);
       }
     } catch (err) {
       showNotification(`Upload failed: ${err.message}`, 'error');
     }
+  };
+
+  // Upload handler for sketch file input
+  const handleSketchUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processSketchFile(file);
+    }
+    // Reset input value so selecting the same file triggers onChange
+    e.target.value = '';
+  };
+
+  // Reset sketch inputs
+  const handleClearSketch = () => {
+    setSketchFile(null);
+    setSketchAssetId(null);
+    setSketchPreviewUrl(null);
+    setPreprocessedMaps(null);
+    showNotification('Sketch cleared.', 'info');
   };
 
   // Sample quick loader
@@ -601,28 +625,61 @@ export default function Studio() {
                   </div>
                 </div>
 
+                {/* Hidden Global / Reusable File Input */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleSketchUpload}
+                />
+
                 {sketchPreviewUrl ? (
-                  <div className="relative aspect-square rounded-xl bg-black border border-[#242A38] overflow-hidden group">
-                    <img src={sketchPreviewUrl} alt="Uploaded sketch" className="w-full h-full object-contain" />
+                  <div className="space-y-2">
+                    <div className="relative aspect-square rounded-xl bg-black border border-[#242A38] overflow-hidden group">
+                      <img src={sketchPreviewUrl} alt="Uploaded sketch" className="w-full h-full object-contain" />
+                      <button
+                        onClick={handleClearSketch}
+                        className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/80 text-white hover:bg-rose-600 transition-colors shadow-md"
+                        title="Remove sketch"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
                     <button
-                      onClick={() => {
-                        setSketchFile(null);
-                        setSketchAssetId(null);
-                        setSketchPreviewUrl(null);
-                        setPreprocessedMaps(null);
-                      }}
-                      className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/75 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-rose-600"
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full py-2 px-3 rounded-xl border border-[#242A38] hover:border-[#8B5CF6]/50 bg-[#171B25] text-xs font-semibold text-white hover:text-[#A78BFA] flex items-center justify-center gap-2 transition-all shadow-sm"
                     >
-                      <X className="w-4 h-4" />
+                      <Upload className="w-3.5 h-3.5 text-[#8B5CF6]" />
+                      Change / Replace Sketch
                     </button>
                   </div>
                 ) : (
-                  <label className="flex flex-col items-center justify-center aspect-[4/3] border-2 border-dashed border-[#242A38] hover:border-[#8B5CF6]/60 rounded-xl p-4 cursor-pointer bg-[#171B25]/50 transition-colors">
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setIsDragOverLeft(true);
+                    }}
+                    onDragLeave={() => setIsDragOverLeft(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsDragOverLeft(false);
+                      const file = e.dataTransfer.files?.[0];
+                      if (file) processSketchFile(file);
+                    }}
+                    className={`flex flex-col items-center justify-center aspect-[4/3] border-2 border-dashed rounded-xl p-4 cursor-pointer transition-all ${
+                      isDragOverLeft
+                        ? 'border-[#8B5CF6] bg-[#8B5CF6]/15 scale-[1.01]'
+                        : 'border-[#242A38] hover:border-[#8B5CF6]/60 bg-[#171B25]/50'
+                    }`}
+                  >
                     <Upload className="w-7 h-7 text-[#8B5CF6] mb-2" />
-                    <span className="text-xs font-medium text-white">Upload Sketch Image</span>
+                    <span className="text-xs font-semibold text-white">Upload Sketch Image</span>
                     <span className="text-[10px] text-[#94A3B8] mt-1">PNG, JPG, JPEG, WebP</span>
-                    <input type="file" accept="image/*" className="hidden" onChange={handleSketchUpload} />
-                  </label>
+                    <span className="text-[10px] text-[#A78BFA] mt-1.5 font-medium">Click or Drag &amp; Drop</span>
+                  </div>
                 )}
               </div>
 
@@ -816,6 +873,14 @@ export default function Studio() {
                 afterImage={activeRenderResult}
                 beforeLabel="Input Sketch Structure"
                 afterLabel="Photorealistic Packaging Render"
+                onUploadClick={() => {
+                  setIsLeftOpen(true);
+                  fileInputRef.current?.click();
+                }}
+                onFileDrop={(file) => {
+                  setIsLeftOpen(true);
+                  processSketchFile(file);
+                }}
               />
 
               {/* Render Metadata Card if completed */}
