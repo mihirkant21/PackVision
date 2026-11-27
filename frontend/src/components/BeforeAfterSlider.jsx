@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Eye, Split, Sparkles, Layers, Upload } from 'lucide-react';
+import { Eye, Split, Sparkles, Layers, Upload, X } from 'lucide-react';
 
 export default function BeforeAfterSlider({
   beforeImage,
@@ -8,6 +8,7 @@ export default function BeforeAfterSlider({
   afterLabel = 'AI Photoreal Render',
   onUploadClick,
   onFileDrop,
+  onClearAfter,
 }) {
   const [sliderPos, setSliderPos] = useState(50);
   const [isDragging, setIsDragging] = useState(false);
@@ -107,6 +108,19 @@ export default function BeforeAfterSlider({
             {afterLabel}
           </span>
         </div>
+        {onClearAfter && (
+          <div className="absolute top-4 right-4 pointer-events-auto">
+            <button
+              type="button"
+              onClick={onClearAfter}
+              className="px-2.5 py-1 rounded-md bg-[#171B25]/90 hover:bg-rose-600 text-[#94A3B8] hover:text-white border border-[#242A38] shadow-md backdrop-blur-sm transition-all flex items-center gap-1.5 text-xs font-medium"
+              title="Clear Render Output"
+            >
+              <X className="w-3.5 h-3.5 text-rose-400" />
+              <span>Clear Render</span>
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -172,11 +186,21 @@ export default function BeforeAfterSlider({
           {beforeLabel}
         </span>
       </div>
-      <div className="absolute top-4 right-4 pointer-events-none">
-        <span className="px-3 py-1 rounded-md text-xs font-semibold bg-brand-primary/90 text-white shadow-md backdrop-blur-sm flex items-center gap-1.5">
+      <div className="absolute top-4 right-4 flex items-center gap-2">
+        <span className="px-3 py-1 rounded-md text-xs font-semibold bg-[#8B5CF6]/90 text-white shadow-md backdrop-blur-sm flex items-center gap-1.5 pointer-events-none">
           <Sparkles className="w-3.5 h-3.5" />
           {afterLabel}
         </span>
+        {onClearAfter && (
+          <button
+            type="button"
+            onClick={onClearAfter}
+            className="p-1 rounded-md bg-[#171B25]/90 hover:bg-rose-600 text-white border border-[#242A38] shadow-md backdrop-blur-sm transition-all pointer-events-auto"
+            title="Clear Render Output"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
       {/* Bottom hint */}

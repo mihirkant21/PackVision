@@ -8,6 +8,7 @@ import {
   Split,
   Download,
   RotateCw,
+  RotateCcw,
   X,
   Check,
   AlertCircle,
@@ -150,30 +151,6 @@ export default function Studio() {
     }
   }, [studioInitialState]);
 
-  // Sync activeRenderResult whenever generationMeta is present
-  useEffect(() => {
-    if (generationMeta) {
-      const firstOut = generationMeta.outputs && generationMeta.outputs[0];
-      const outputAsset = firstOut?.asset || (generationMeta.assets?.find((a) => a.asset_type === 'output'));
-      const outputAssetId = firstOut?.asset_id || outputAsset?.id || generationMeta.output_asset_id;
-      const outputUrl = outputAsset?.url || (outputAssetId ? `/api/v1/files/${outputAssetId}` : null);
-
-      if (outputUrl && !activeRenderResult) {
-        setActiveRenderResult(outputUrl);
-        setActiveRenderAssetId(outputAssetId);
-        setRawRenderResult(outputUrl);
-        setRawRenderAssetId(outputAssetId);
-      }
-
-      const inAsset = generationMeta.input_asset || (generationMeta.assets?.find((a) => a.asset_type === 'sketch'));
-      const inAssetId = generationMeta.input_asset_id || inAsset?.id;
-      const inUrl = inAsset?.url || (inAssetId ? `/api/v1/files/${inAssetId}` : null);
-      if (inUrl && !sketchPreviewUrl) {
-        setSketchAssetId(inAssetId);
-        setSketchPreviewUrl(inUrl);
-      }
-    }
-  }, [generationMeta, activeRenderResult, sketchPreviewUrl]);
 
   // Auto-restore latest generation on initial mount if workspace is empty
   useEffect(() => {
@@ -308,7 +285,34 @@ export default function Studio() {
     setSketchAssetId(null);
     setSketchPreviewUrl(null);
     setPreprocessedMaps(null);
-    showNotification('Sketch cleared.', 'info');
+    showNotification('Sketch input cleared.', 'info');
+  };
+
+  // Clear output render result
+  const handleClearOutput = () => {
+    setActiveRenderResult(null);
+    setActiveRenderAssetId(null);
+    setRawRenderResult(null);
+    setRawRenderAssetId(null);
+    setGenerationMeta(null);
+    showNotification('Render output cleared.', 'info');
+  };
+
+  // Full reset / new packaging workspace
+  const handleResetWorkspace = () => {
+    setSketchFile(null);
+    setSketchAssetId(null);
+    setSketchPreviewUrl(null);
+    setPreprocessedMaps(null);
+    setActiveRenderResult(null);
+    setActiveRenderAssetId(null);
+    setRawRenderResult(null);
+    setRawRenderAssetId(null);
+    setGenerationMeta(null);
+    setLogoAssetId(null);
+    setLogoPreviewUrl(null);
+    setCurrentJobId(null);
+    showNotification('Workspace reset for new design.', 'info');
   };
 
   // Sample quick loader
@@ -540,15 +544,36 @@ export default function Studio() {
           )}
 
           {activeRenderResult && (
-            <a
-              href={activeRenderResult}
-              download={`packvision_${packageType}.png`}
-              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-[#8B5CF6] hover:bg-[#7C3AED] text-white flex items-center gap-1.5 shadow-md shadow-[#8B5CF6]/20 transition-all"
-              title="Download Render Image"
+            <>
+              <a
+                href={activeRenderResult}
+                download={`packvision_${packageType}.png`}
+                className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-[#8B5CF6] hover:bg-[#7C3AED] text-white flex items-center gap-1.5 shadow-md shadow-[#8B5CF6]/20 transition-all"
+                title="Download Render Image"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span className="hidden lg:inline">Download</span>
+              </a>
+              <button
+                onClick={handleClearOutput}
+                className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#171B25] hover:bg-rose-500/15 text-[#94A3B8] hover:text-rose-400 border border-[#242A38] hover:border-rose-500/30 flex items-center gap-1.5 transition-all"
+                title="Clear Output Render (Keep sketch and settings)"
+              >
+                <X className="w-3.5 h-3.5 text-rose-400" />
+                <span className="hidden lg:inline">Clear Render</span>
+              </button>
+            </>
+          )}
+
+          {(sketchPreviewUrl || activeRenderResult) && (
+            <button
+              onClick={handleResetWorkspace}
+              className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#171B25] hover:bg-[#242A38] text-[#94A3B8] hover:text-white border border-[#242A38] flex items-center gap-1.5 transition-all"
+              title="Reset Entire Workspace (Clear sketch & render)"
             >
-              <Download className="w-3.5 h-3.5" />
-              <span className="hidden lg:inline">Download</span>
-            </a>
+              <RotateCcw className="w-3.5 h-3.5 text-[#A78BFA]" />
+              <span className="hidden md:inline">Reset Workspace</span>
+            </button>
           )}
 
           {/* Full Canvas Focus Toggle */}
@@ -881,6 +906,7 @@ export default function Studio() {
                   setIsLeftOpen(true);
                   processSketchFile(file);
                 }}
+                onClearAfter={handleClearOutput}
               />
 
               {/* Render Metadata Card if completed */}
